@@ -377,3 +377,23 @@ class Animator(QObject):
 
     def _emit_current_frame(self, pixmap: QPixmap) -> None:
         self.frame_changed.emit(pixmap, self._facing_left)
+
+        # ---------------- fare takibi ----------------
+
+    def face_toward_x(self, cursor_global_x: int, pet_center_x: int) -> None:
+        """Fare pozisyonuna göre tavşanı sağa/sola çevir.
+        Yürüme, uyku, davranış esnasında yön değiştirmez."""
+        # Bu durumlarda müdahale etme
+        if self._is_sleeping or self._is_walking or self._current_behavior is not None:
+            return
+
+        # Eşik: fare çok yakınsa yön değiştirme (yalpalama olmasın)
+        dx = cursor_global_x - pet_center_x
+        if abs(dx) < 30:
+            return
+
+        new_facing_left = (dx < 0)
+        if new_facing_left != self._facing_left:
+            self._facing_left = new_facing_left
+            # Mevcut frame'i yeni yönle tekrar yay
+            self._emit_current_frame(self.pet.idle_pixmap)

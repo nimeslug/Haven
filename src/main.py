@@ -57,11 +57,24 @@ class HavenApp:
         y = geo.bottom() - self.window.height() - margin
         self.window.move(x, y)
 
+        # Fare takip zamanlayıcısı
+        from PySide6.QtCore import QTimer
+        self._cursor_timer = QTimer()
+        self._cursor_timer.timeout.connect(self._check_cursor_direction)
+        self._cursor_timer.start(400)  # her 400ms'de bir kontrol
+
     def _on_pet_clicked(self) -> None:
         self.animator.trigger_behavior("happy_jump")
 
     def _on_bubble_requested(self, emoji: str) -> None:
         self.window.show_bubble(emoji, duration_ms=self.current_pet.bubbles.duration_ms)
+
+    def _check_cursor_direction(self) -> None:
+        """Fare pozisyonuna göre tavşanı çevir."""
+        from PySide6.QtGui import QCursor
+        cursor_pos = QCursor.pos()  # global koordinatlar
+        pet_center_x = self.window.x() + self.window.width() // 2
+        self.animator.face_toward_x(cursor_pos.x(), pet_center_x)
 
     def _build_menu(self) -> QMenu:
         menu = QMenu()
