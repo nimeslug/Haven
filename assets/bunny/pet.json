@@ -15,6 +15,12 @@
     "float_amplitude_px": 2,
     "float_period_ms": 4500
   },
+  "flee": {
+    "enabled": true,
+    "trigger_distance_px": 120,
+    "flee_distance_px": 100,
+    "cooldown_ms": 3000
+  },
   "walk": {
     "enabled": true,
     "walk_probability": 0.5,

@@ -43,6 +43,12 @@ class SleepConfig:
     float_amplitude_px: int = 2
     float_period_ms: int = 4500
 
+@dataclass
+class FleeConfig:
+    enabled: bool = False
+    trigger_distance_px: int = 120
+    flee_distance_px: int = 100
+    cooldown_ms: int = 3000
 
 @dataclass
 class BubbleConfig:
@@ -74,6 +80,7 @@ class Pet:
     sleep: SleepConfig = field(default_factory=SleepConfig)
     bubbles: BubbleConfig = field(default_factory=BubbleConfig)
     idle_event: IdleEventConfig = field(default_factory=IdleEventConfig)
+    flee: FleeConfig = field(default_factory=FleeConfig)
 
 
 def _load_pixmap(path: Path, size: int) -> QPixmap:
@@ -152,6 +159,12 @@ def load_pet(pet_dir: Path) -> Pet:
             idle_timeout_ms=int(sleep_cfg.get("idle_timeout_ms", 15000)),
             float_amplitude_px=int(sleep_cfg.get("float_amplitude_px", 2)),
             float_period_ms=int(sleep_cfg.get("float_period_ms", 4500)),
+        ),
+        flee=FleeConfig(
+            enabled=bool(config.get("flee", {}).get("enabled", False)),
+            trigger_distance_px=int(config.get("flee", {}).get("trigger_distance_px", 120)),
+            flee_distance_px=int(config.get("flee", {}).get("flee_distance_px", 100)),
+            cooldown_ms=int(config.get("flee", {}).get("cooldown_ms", 3000)),
         ),
         bubbles=BubbleConfig(
             random_emojis=list(bubbles_cfg.get("random_emojis", [])),

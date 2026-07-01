@@ -1,7 +1,8 @@
 """
 animator.py
 -----------
-Pet motoru: nefes alma, davranışlar, ayrık zıplamalarla yürüme, uyku, baloncuklar.
+Pet motoru: nefes alma, davranışlar, ayrık zıplamalarla yürüme, uyku, baloncuklar,
+fare takibi ve fareden kaçma.
 """
 from __future__ import annotations
 
@@ -53,7 +54,6 @@ class Animator(QObject):
         self._is_walking: bool = False
         self._walk_remaining_distance: float = 0.0
         self._walk_direction: int = 1
-        # Hop faz durumu: "idle" (henüz başlamadı), "airborne" (havada), "resting" (yerde mola)
         self._hop_phase: str = "idle"
         self._hop_elapsed_ms: int = 0
         self._hop_distance: float = 0.0
@@ -70,6 +70,9 @@ class Animator(QObject):
         self._is_sleeping: bool = False
         self._last_activity_ms: int = 0
         self._sleep_bubble_last_ms: int = 0
+
+        # Kaçma (flee)
+        self._last_flee_ms: int = -100000  # başta cooldown'dan geçsin
 
     # ---------------- yaşam döngüsü ----------------
 
@@ -150,8 +153,6 @@ class Animator(QObject):
     def _check_sleep_transition(self, now_ms: int) -> None:
         if not self.pet.sleep.enabled or self._is_sleeping:
             return
-        # Meşgulse şimdi uyutma AMA aktivite zamanını RESET ETME.
-        # (Eski bug: bu satır burada zaman reset ediyordu, timer hiç dolmuyordu)
         if self._is_walking or self._current_behavior is not None or self._is_click_jumping:
             return
         if now_ms - self._last_activity_ms >= self.pet.sleep.idle_timeout_ms:
@@ -200,18 +201,15 @@ class Animator(QObject):
 
         total_offset = 0
 
-        # Float sadece hiçbir hareket yokken
         if (not self._is_walking and not self._is_click_jumping
                 and self.pet.float_amplitude_px > 0):
             phase = (now / self.pet.float_period_ms) * 2 * math.pi
             offset = int(round(math.sin(phase) * self.pet.float_amplitude_px))
             total_offset += offset
 
-        # Yürüme (hop-based)
         if self._is_walking:
             total_offset += self._advance_hop(dt_ms)
 
-        # Tıklama zıplaması
         if self._is_click_jumping:
             self._click_jump_elapsed_ms += dt_ms
             if self._click_jump_elapsed_ms >= self.CLICK_JUMP_DURATION_MS:
@@ -226,30 +224,24 @@ class Animator(QObject):
     # ---------------- yürüme (hop) ----------------
 
     def _advance_hop(self, dt_ms: int) -> int:
-        """Yürüme sırasında bir tick ilerlet. Y-offset döndürür."""
         wc = self.pet.walk
 
-        # Mola fazı
         if self._hop_phase == "resting":
             self._hop_elapsed_ms += dt_ms
             if self._hop_elapsed_ms >= wc.hop_pause_ms:
                 self._start_next_hop_if_needed()
             return 0
 
-        # Havada değilse (idle → henüz başlamadı) mola gibi davran
         if self._hop_phase != "airborne":
             return 0
 
-        # Havada
         self._hop_elapsed_ms += dt_ms
 
         if self._hop_elapsed_ms >= wc.hop_duration_ms:
-            # Hop bitti — kalan x'i yolla
             leftover = int(round(self._hop_distance)) - self._hop_x_accumulated
             if leftover > 0:
                 self.position_delta.emit(leftover * self._walk_direction, 0)
                 self._hop_x_accumulated += leftover
-            # Mola fazına geç
             self._hop_phase = "resting"
             self._hop_elapsed_ms = 0
             self._emit_current_frame(self.pet.idle_pixmap)
@@ -257,26 +249,20 @@ class Animator(QObject):
 
         t = self._hop_elapsed_ms / wc.hop_duration_ms
 
-        # X yatayda lineer ilerler (pürüzlü olmasın diye toplam-hedeften delta)
         target_x = int(round(self._hop_distance * t))
         dx = target_x - self._hop_x_accumulated
         if dx > 0:
             self.position_delta.emit(dx * self._walk_direction, 0)
             self._hop_x_accumulated = target_x
 
-        # Y parabol: 4t(1-t)
         y_offset = -int(round(4 * t * (1 - t) * wc.hop_height_px))
 
-        # Frame seçimi (kalkış → havada → iniş)
         frames = wc.frames
         if t < 0.15 or t > 0.85:
-            # Kalkış hazırlığı / iniş → oturmuş poz
             pix = self.pet.idle_pixmap
         elif t < 0.55:
-            # Yukarı çıkarken
             pix = frames[0] if frames else self.pet.idle_pixmap
         else:
-            # İniyor
             pix = frames[1] if len(frames) > 1 else (frames[0] if frames else self.pet.idle_pixmap)
         self._emit_current_frame(pix)
 
@@ -290,11 +276,9 @@ class Animator(QObject):
         self._walk_remaining_distance = float(distance)
         self._walk_direction = direction
         self._is_walking = True
-        # İlk hop'u başlat
         self._start_next_hop_if_needed()
 
     def _start_next_hop_if_needed(self) -> None:
-        """Yürümeye devam edecek mi? Evet → yeni hop başlat. Hayır → yürümeyi bitir."""
         wc = self.pet.walk
         if self._walk_remaining_distance <= 0.5:
             self._is_walking = False
@@ -303,7 +287,6 @@ class Animator(QObject):
             self._schedule_next_idle_event()
             return
 
-        # Bu hop'ta ne kadar gideceğiz?
         self._hop_distance = min(float(wc.hop_distance_px), self._walk_remaining_distance)
         self._walk_remaining_distance -= self._hop_distance
         self._hop_elapsed_ms = 0
@@ -323,7 +306,6 @@ class Animator(QObject):
         if self._is_sleeping:
             return
         wc = self.pet.walk
-        # Yürüme aktifse ve olasılık tuttu ise yürü
         if wc.enabled and wc.frames and random.random() < wc.walk_probability:
             self._start_walking()
         else:
@@ -378,22 +360,47 @@ class Animator(QObject):
     def _emit_current_frame(self, pixmap: QPixmap) -> None:
         self.frame_changed.emit(pixmap, self._facing_left)
 
-        # ---------------- fare takibi ----------------
+    # ---------------- fare takibi ----------------
 
-    def face_toward_x(self, cursor_global_x: int, pet_center_x: int) -> None:
-        """Fare pozisyonuna göre tavşanı sağa/sola çevir.
-        Yürüme, uyku, davranış esnasında yön değiştirmez."""
-        # Bu durumlarda müdahale etme
-        if self._is_sleeping or self._is_walking or self._current_behavior is not None:
+    def face_toward_cursor(self, cursor_global_x: int, cursor_global_y: int,
+                           pet_center_x: int, pet_center_y: int) -> None:
+        """Fareye göre yön çevir + yakınsa kaç."""
+        if self._is_sleeping or self._current_behavior is not None:
             return
 
-        # Eşik: fare çok yakınsa yön değiştirme (yalpalama olmasın)
         dx = cursor_global_x - pet_center_x
+        dy = cursor_global_y - pet_center_y
+        distance = math.hypot(dx, dy)
+
+        fc = self.pet.flee
+        now = self._tick_elapsed.elapsed()
+
+        # Kaçma tetikleyicisi (yürümüyorsa ve cooldown bittiyse)
+        if (fc.enabled and not self._is_walking
+                and distance < fc.trigger_distance_px
+                and now - self._last_flee_ms > fc.cooldown_ms):
+            self._start_flee(dx)
+            self._last_flee_ms = now
+            return
+
+        # Yön çevirme — yürümüyorsa ve eşik dışıysa
+        if self._is_walking:
+            return
         if abs(dx) < 30:
             return
 
         new_facing_left = (dx < 0)
         if new_facing_left != self._facing_left:
             self._facing_left = new_facing_left
-            # Mevcut frame'i yeni yönle tekrar yay
             self._emit_current_frame(self.pet.idle_pixmap)
+
+    def _start_flee(self, cursor_dx: float) -> None:
+        """Fareden ters yöne bir hop kaç."""
+        fc = self.pet.flee
+        # Fare sağda ise sola kaç, solda ise sağa
+        direction = -1 if cursor_dx > 0 else 1
+        self._facing_left = (direction == -1)
+        self._walk_remaining_distance = float(fc.flee_distance_px)
+        self._walk_direction = direction
+        self._is_walking = True
+        self._start_next_hop_if_needed()

@@ -70,11 +70,15 @@ class HavenApp:
         self.window.show_bubble(emoji, duration_ms=self.current_pet.bubbles.duration_ms)
 
     def _check_cursor_direction(self) -> None:
-        """Fare pozisyonuna göre tavşanı çevir."""
+        """Fare pozisyonuna göre tavşanı çevir, yakınsa kaçır."""
         from PySide6.QtGui import QCursor
-        cursor_pos = QCursor.pos()  # global koordinatlar
+        cursor_pos = QCursor.pos()
         pet_center_x = self.window.x() + self.window.width() // 2
-        self.animator.face_toward_x(cursor_pos.x(), pet_center_x)
+        pet_center_y = self.window.y() + self.window.height() // 2
+        self.animator.face_toward_cursor(
+            cursor_pos.x(), cursor_pos.y(),
+            pet_center_x, pet_center_y
+        )
 
     def _build_menu(self) -> QMenu:
         menu = QMenu()
