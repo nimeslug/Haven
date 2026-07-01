@@ -97,7 +97,3 @@ Haven/
 - [ ] Control panel with tabs (quick commands, settings, chat, reminders)
 - [ ] Standalone `.exe` build
 - [ ] More pets: Bambi 🦌, Capybara 🐹
-
-## 📜 License
-
-MIT — see `LICENSE` file.
