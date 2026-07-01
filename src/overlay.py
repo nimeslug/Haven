@@ -14,7 +14,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget, QLabel, QMenu, QGraphicsOpacityEffect
 
 
-TRANSPARENT_COLOR = QColor(255, 0, 255)
+TRANSPARENT_COLOR = QColor(1, 2, 3)  # neredeyse siyah - hiçbir görselde olmaz
 
 
 def _make_window_transparent_windows(hwnd: int) -> None:
@@ -27,7 +27,9 @@ def _make_window_transparent_windows(hwnd: int) -> None:
     user32 = ctypes.windll.user32
     ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
     user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED)
-    user32.SetLayeredWindowAttributes(hwnd, 0x00FF00FF, 0, LWA_COLORKEY)
+    # COLORREF Windows'ta 0x00BBGGRR formatında.
+    # RGB(1,2,3) → BGR(3,2,1) → 0x00030201
+    user32.SetLayeredWindowAttributes(hwnd, 0x00030201, 0, LWA_COLORKEY)
 
 
 CLICK_DRAG_THRESHOLD = 5
