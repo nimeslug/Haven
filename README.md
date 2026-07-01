@@ -1,5 +1,7 @@
 # Haven 🏡
 
+![Pamuk on the desktop](docs/demo.png)
+
 > A cozy desktop companion — meet **Pamuk**, a pixel-art bunny who lives on your screen, hops around, sleeps, and reacts to your cursor.
 
 Haven is an extensible desktop pet framework built with Python and PySide6. It ships with Pamuk 🐰, but its plugin-style architecture lets you add new animals by simply dropping a folder into `assets/`.
