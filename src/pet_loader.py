@@ -11,6 +11,7 @@ from typing import Dict, List
 
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -81,6 +82,8 @@ class Pet:
     bubbles: BubbleConfig = field(default_factory=BubbleConfig)
     idle_event: IdleEventConfig = field(default_factory=IdleEventConfig)
     flee: FleeConfig = field(default_factory=FleeConfig)
+    look_up_pixmap: Optional[QPixmap] = None
+    look_down_pixmap: Optional[QPixmap] = None
 
 
 def _load_pixmap(path: Path, size: int) -> QPixmap:
@@ -140,6 +143,8 @@ def load_pet(pet_dir: Path) -> Pet:
         display_size=size,
         idle_pixmap=idle_pixmap,
         sleep_pixmap=sleep_pixmap,
+        look_up_pixmap=get_frame(config["look_up_frame"]) if "look_up_frame" in config else None,
+        look_down_pixmap=get_frame(config["look_down_frame"]) if "look_down_frame" in config else None,
         behaviors=behaviors,
         float_amplitude_px=int(float_cfg.get("amplitude_px", 0)),
         float_period_ms=int(float_cfg.get("period_ms", 2000)),

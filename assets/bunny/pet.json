@@ -5,6 +5,8 @@
   "display_size": 180,
   "idle_frame": "idle_open.png",
   "sleep_frame": "sleeping.png",
+  "look_up_frame": "look_up.png",
+  "look_down_frame": "look_down.png",
   "float": {
     "amplitude_px": 3,
     "period_ms": 2400

@@ -364,7 +364,7 @@ class Animator(QObject):
 
     def face_toward_cursor(self, cursor_global_x: int, cursor_global_y: int,
                            pet_center_x: int, pet_center_y: int) -> None:
-        """Fareye göre yön çevir + yakınsa kaç."""
+        """Fareye göre yön çevir + dikey bakma + yakınsa kaç."""
         if self._is_sleeping or self._current_behavior is not None:
             return
 
@@ -375,7 +375,7 @@ class Animator(QObject):
         fc = self.pet.flee
         now = self._tick_elapsed.elapsed()
 
-        # Kaçma tetikleyicisi (yürümüyorsa ve cooldown bittiyse)
+        # 1) Kaçma tetikleyicisi
         if (fc.enabled and not self._is_walking
                 and distance < fc.trigger_distance_px
                 and now - self._last_flee_ms > fc.cooldown_ms):
@@ -383,16 +383,34 @@ class Animator(QObject):
             self._last_flee_ms = now
             return
 
-        # Yön çevirme — yürümüyorsa ve eşik dışıysa
+        # 2) Yürüyorsa hiçbir şey değiştirme
         if self._is_walking:
             return
-        if abs(dx) < 30:
+
+        # 3) Dikey bakma — fare tavşana yatayda yakınsa
+        # (yani "üstünde/altında" ise)
+        VERTICAL_LOOK_HORIZONTAL_TOLERANCE = 80  # yatayda bu kadar yakınsa dikey bakma tetiklenir
+        VERTICAL_LOOK_MIN_DY = 60                # yukarı/aşağı ne kadar uzakta olmalı
+
+        if abs(dx) < VERTICAL_LOOK_HORIZONTAL_TOLERANCE:
+            if dy < -VERTICAL_LOOK_MIN_DY and self.pet.look_up_pixmap is not None:
+                # Fare çok yukarıda → look_up
+                self._emit_current_frame(self.pet.look_up_pixmap)
+                return
+            elif dy > VERTICAL_LOOK_MIN_DY and self.pet.look_down_pixmap is not None:
+                # Fare çok aşağıda → look_down
+                self._emit_current_frame(self.pet.look_down_pixmap)
+                return
+            # Fare tam üstünde ama yakın → idle
+            self._emit_current_frame(self.pet.idle_pixmap)
             return
 
+        # 4) Yatay yön çevirme
         new_facing_left = (dx < 0)
         if new_facing_left != self._facing_left:
             self._facing_left = new_facing_left
-            self._emit_current_frame(self.pet.idle_pixmap)
+        # Her durumda idle frame'ini yeni yönle yay
+        self._emit_current_frame(self.pet.idle_pixmap)
 
     def _start_flee(self, cursor_dx: float) -> None:
         """Fareden ters yöne bir hop kaç."""
