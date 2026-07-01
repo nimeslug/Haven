@@ -99,12 +99,3 @@ Haven/
 ## 📜 License
 
 MIT — see `LICENSE` file.
-
-## 🙏 Acknowledgments
-
-- Inspired by [myCat](https://github.com/yumiaura/myCat) — a lovely desktop cat that started this whole idea
-- Pixel art frames generated with ChatGPT, background cleaning done manually
-
----
-
-Built with love and a lot of `QPainter` magic. 🎨
