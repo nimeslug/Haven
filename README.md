@@ -1,6 +1,6 @@
 # Haven 🏡
 
-![Pamuk on the desktop](docs/demo.png)
+![Pamuk on the desktop](docs/bunny.png)
 
 > A cozy desktop companion — meet **Pamuk**, a pixel-art bunny who lives on your screen, hops around, sleeps, and reacts to your cursor.
 
