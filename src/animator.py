@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import random
+import time
 from typing import Optional
 
 from PySide6.QtCore import QObject, QTimer, Signal, QElapsedTimer
@@ -25,6 +26,12 @@ class Animator(QObject):
     FLOAT_TICK_MS = 33
     CLICK_JUMP_DURATION_MS = 500
     CLICK_JUMP_HEIGHT_PX = 50
+    # Açlık
+    HUNGER_DECAY_PER_MIN: float = 1.0     # dakikada kaç puan düşer
+    HUNGER_FEED_AMOUNT: float = 30.0      # bir yem kaç puan doldurur
+    HUNGER_FEED_COOLDOWN_MS: int = 60000  # yem verildikten sonra bekleme
+    HUNGER_MAX: float = 100.0
+    HUNGER_MIN: float = 0.0
 
     def __init__(self, pet: Pet, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -73,6 +80,10 @@ class Animator(QObject):
 
         # Kaçma (flee)
         self._last_flee_ms: int = -100000  # başta cooldown'dan geçsin
+        # Açlık — dışarıdan set edilir (user_settings.py yükler)
+        self._hunger: float = 80.0
+        self._last_fed_wall_ts: float = 0.0   # sistem zamanı (time.time())
+        self._hunger_tick_accum_ms: int = 0
 
     # ---------------- yaşam döngüsü ----------------
 
@@ -185,6 +196,12 @@ class Animator(QObject):
         now = self._tick_elapsed.elapsed()
         dt_ms = now - self._last_tick_ms
         self._last_tick_ms = now
+
+        # Açlık — her dakikada bir HUNGER_DECAY_PER_MIN puan
+        self._hunger_tick_accum_ms += dt_ms
+        if self._hunger_tick_accum_ms >= 60000:
+            self._hunger_tick_accum_ms -= 60000
+            self._hunger = max(self.HUNGER_MIN, self._hunger - self.HUNGER_DECAY_PER_MIN)
 
         self._check_sleep_transition(now)
 
@@ -422,3 +439,55 @@ class Animator(QObject):
         self._walk_direction = direction
         self._is_walking = True
         self._start_next_hop_if_needed()
+
+        # ---------------- açlık ----------------
+
+    def get_hunger(self) -> float:
+        return self._hunger
+
+    def set_hunger(self, value: float) -> None:
+        self._hunger = max(self.HUNGER_MIN, min(self.HUNGER_MAX, value))
+
+    def get_last_fed_wall_ts(self) -> float:
+        return self._last_fed_wall_ts
+
+    def set_last_fed_wall_ts(self, ts: float) -> None:
+        self._last_fed_wall_ts = ts
+
+    def can_feed(self) -> bool:
+        """Yem verilebilir mi (cooldown geçti mi)?"""
+        elapsed_since_feed = (time.time() - self._last_fed_wall_ts) * 1000
+        return elapsed_since_feed >= self.HUNGER_FEED_COOLDOWN_MS
+
+    def feed(self) -> bool:
+        """Yem ver. Başarılıysa True döner (cooldown geçtiyse)."""
+        if not self.can_feed():
+            return False
+        self._hunger = min(self.HUNGER_MAX, self._hunger + self.HUNGER_FEED_AMOUNT)
+        self._last_fed_wall_ts = time.time()
+        # Mutluluk tepkisi
+        self._wake_up_if_sleeping()
+        self.bubble_requested.emit("🥕")
+        # Kısa bir zıplama
+        self._is_click_jumping = True
+        self._click_jump_elapsed_ms = 0
+        return True
+
+    def get_hunger_mood(self) -> str:
+        """Açlık seviyesine göre ruh hali etiketi."""
+        h = self._hunger
+        if h >= 70:
+            return "tok"
+        if h >= 40:
+            return "normal"
+        if h >= 20:
+            return "aç"
+        return "çok_aç"
+
+    def apply_offline_hunger_decay(self, elapsed_seconds: float) -> None:
+        """Uygulama kapalıyken geçen süreye göre açlık düşür.
+        Açılışta bir kez çağrılır."""
+        if elapsed_seconds <= 0:
+            return
+        decay = (elapsed_seconds / 60.0) * self.HUNGER_DECAY_PER_MIN
+        self._hunger = max(self.HUNGER_MIN, self._hunger - decay)

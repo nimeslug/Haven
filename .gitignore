@@ -17,3 +17,6 @@ Desktop.ini
 
 # Log
 *.log
+
+# Kullanıcı state'i
+user_settings.json

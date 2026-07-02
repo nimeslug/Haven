@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import time
+from user_settings import UserSettingsStore
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer
@@ -21,6 +23,7 @@ from panel.main_window import PanelWindow
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = PROJECT_ROOT / "assets"
+USER_SETTINGS_PATH = PROJECT_ROOT / "user_settings.json"
 
 
 class HavenApp:
@@ -34,11 +37,15 @@ class HavenApp:
             sys.exit(1)
 
         self.current_pet: Pet = load_pet(self.available_pet_dirs[0])
+        # Kullanıcı ayarlarını yükle
+        self.user_settings = UserSettingsStore(USER_SETTINGS_PATH)
 
         self.window = OverlayWindow(size=self.current_pet.display_size)
         self.window.set_menu_builder(self._build_menu)
 
         self.animator = Animator(self.current_pet)
+        # Açlık durumunu geri yükle + offline geçen süreyi uygula
+        self._restore_pet_state()
         self.animator.frame_changed.connect(self.window.set_pixmap)
         self.animator.offset_changed.connect(self.window.set_y_offset)
         self.animator.position_delta.connect(self.window.move_by)
@@ -53,6 +60,10 @@ class HavenApp:
         self._cursor_timer = QTimer()
         self._cursor_timer.timeout.connect(self._check_cursor_direction)
         self._cursor_timer.start(400)
+        # Kalıcı kayıt zamanlayıcısı - her 30 sn'de bir açlığı diske yaz
+        self._save_timer = QTimer()
+        self._save_timer.timeout.connect(self._persist_pet_state)
+        self._save_timer.start(30000)
 
         # Panel (henüz açılmadı)
         self._panel: Optional[PanelWindow] = None
@@ -142,7 +153,33 @@ class HavenApp:
         self.animator.toggle_sleep()
         self._refresh_tray_menu()
 
+    def _restore_pet_state(self) -> None:
+        """Mevcut pet için açlık ve son yem zamanını user_settings'ten yükle,
+        offline süreye göre açlığı düşür."""
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        self.animator.set_hunger(state.hunger)
+        self.animator.set_last_fed_wall_ts(state.last_fed_ts)
+
+        # Offline geçen süreyi uygula
+        if state.last_saved_ts > 0:
+            elapsed = time.time() - state.last_saved_ts
+            if elapsed > 0:
+                self.animator.apply_offline_hunger_decay(elapsed)
+
+    def _persist_pet_state(self) -> None:
+        """Şu anki pet durumunu user_settings'e yaz."""
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        state.hunger = self.animator.get_hunger()
+        state.last_fed_ts = self.animator.get_last_fed_wall_ts()
+        state.last_saved_ts = time.time()
+        self.user_settings.save()
+
     def _quit(self) -> None:
+        self._persist_pet_state()
         if self._panel is not None:
             self._panel.close()
         self.tray.hide()
@@ -235,10 +272,14 @@ class HavenApp:
     def _switch_pet(self, pet_dir: Path) -> None:
         if pet_dir.name == self.current_pet.folder_name:
             return
+        # Önce mevcut pet'in durumunu kaydet
+        self._persist_pet_state()
         new_pet = load_pet(pet_dir)
         self.current_pet = new_pet
         self.window.resize(new_pet.display_size, new_pet.display_size)
         self.animator.switch_pet(new_pet)
+        # Yeni pet'in açlık durumunu geri yükle
+        self._restore_pet_state()
         icon_path = self.current_pet_icon_path()
         if icon_path:
             self.tray.setIcon(QIcon(str(icon_path)))
