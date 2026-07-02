@@ -10,7 +10,7 @@ import time
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QGridLayout, QProgressBar
+    QGridLayout, QProgressBar, QScrollArea
 )
 from PySide6.QtGui import QFont
 
@@ -22,6 +22,23 @@ class MainTab(QWidget):
         super().__init__(parent)
         self.haven_app = haven_app
 
+        # Ana layout — scroll area barındırır
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        # Scroll area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; }")
+        outer_layout.addWidget(scroll)
+
+        # İçerik konteynerı (bunun içine _build_ui inşa edecek)
+        self._content = QWidget()
+        self._content.setStyleSheet("background: transparent;")
+        scroll.setWidget(self._content)
+
         self._build_ui()
 
         self._status_timer = QTimer(self)
@@ -29,7 +46,7 @@ class MainTab(QWidget):
         self._status_timer.start(500)
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout(self._content)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(14)
 

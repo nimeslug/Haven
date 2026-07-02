@@ -35,8 +35,8 @@ class PanelWindow(QMainWindow):
         self.haven_app = haven_app
 
         self.setWindowTitle("Haven — Kontrol Paneli")
-        self.resize(720, 520)
-        self.setMinimumSize(600, 420)
+        self.resize(820, 680)
+        self.setMinimumSize(720, 600)
 
         # Pencere ikonu
         icon_path = haven_app.current_pet_icon_path()
