@@ -1,7 +1,7 @@
 """
 main_tab.py
 -----------
-🐾 Ana sekme — hızlı komut butonları, pet durumu, konum, açlık göstergesi.
+🐾 Ana sekme — durum, açlık, envanter, hızlı komutlar.
 """
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QGridLayout, QProgressBar
 )
 from PySide6.QtGui import QFont
+
+from inventory import FOODS, seconds_until_next_daily, can_claim_daily_reward
 
 
 class MainTab(QWidget):
@@ -29,14 +31,14 @@ class MainTab(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setSpacing(14)
 
         # ---- Başlık ----
         title = QLabel(f"{self.haven_app.current_pet.emoji}  {self.haven_app.current_pet.name}")
-        title_font = QFont()
-        title_font.setPointSize(20)
-        title_font.setBold(True)
-        title.setFont(title_font)
+        tf = QFont()
+        tf.setPointSize(20)
+        tf.setBold(True)
+        title.setFont(tf)
         layout.addWidget(title)
 
         subtitle = QLabel(f"{self.haven_app.current_pet.species} · Quick controls")
@@ -50,48 +52,39 @@ class MainTab(QWidget):
 
         # ---- Durum kutusu ----
         status_box = QFrame()
-        status_box.setStyleSheet("""
-            QFrame {
-                background: #f7f7f9;
-                border-radius: 10px;
-            }
-        """)
-        status_layout = QVBoxLayout(status_box)
-        status_layout.setContentsMargins(14, 12, 14, 12)
-        status_layout.setSpacing(6)
+        status_box.setStyleSheet("QFrame { background: #f7f7f9; border-radius: 10px; }")
+        sl = QVBoxLayout(status_box)
+        sl.setContentsMargins(14, 12, 14, 12)
+        sl.setSpacing(6)
 
         self._status_label = QLabel("Durum: —")
         self._status_label.setStyleSheet("font-size: 14px; font-weight: 600;")
-        status_layout.addWidget(self._status_label)
+        sl.addWidget(self._status_label)
 
         self._position_label = QLabel("Konum: —")
         self._position_label.setStyleSheet("font-size: 12px; color: #666;")
-        status_layout.addWidget(self._position_label)
+        sl.addWidget(self._position_label)
 
         layout.addWidget(status_box)
 
         # ---- Açlık göstergesi ----
         hunger_box = QFrame()
-        hunger_box.setStyleSheet("""
-            QFrame {
-                background: #fff8ee;
-                border: 1px solid #f0e0c0;
-                border-radius: 10px;
-            }
-        """)
-        hunger_layout = QVBoxLayout(hunger_box)
-        hunger_layout.setContentsMargins(14, 12, 14, 12)
-        hunger_layout.setSpacing(10)
+        hunger_box.setStyleSheet(
+            "QFrame { background: #fff8ee; border: 1px solid #f0e0c0; border-radius: 10px; }"
+        )
+        hl = QVBoxLayout(hunger_box)
+        hl.setContentsMargins(14, 12, 14, 12)
+        hl.setSpacing(8)
 
-        hunger_header = QHBoxLayout()
-        hunger_title = QLabel("🥕 Beslenme")
-        hunger_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #555;")
-        hunger_header.addWidget(hunger_title)
-        hunger_header.addStretch()
+        hh = QHBoxLayout()
+        ht = QLabel("🥕 Beslenme")
+        ht.setStyleSheet("font-size: 13px; font-weight: 700; color: #555;")
+        hh.addWidget(ht)
+        hh.addStretch()
         self._hunger_percent_label = QLabel("—%")
         self._hunger_percent_label.setStyleSheet("font-size: 13px; color: #666;")
-        hunger_header.addWidget(self._hunger_percent_label)
-        hunger_layout.addLayout(hunger_header)
+        hh.addWidget(self._hunger_percent_label)
+        hl.addLayout(hh)
 
         self._hunger_bar = QProgressBar()
         self._hunger_bar.setMinimum(0)
@@ -100,37 +93,82 @@ class MainTab(QWidget):
         self._hunger_bar.setTextVisible(False)
         self._hunger_bar.setFixedHeight(14)
         self._hunger_bar.setStyleSheet(self._hunger_bar_style("#8BC34A"))
-        hunger_layout.addWidget(self._hunger_bar)
+        hl.addWidget(self._hunger_bar)
 
         self._hunger_mood_label = QLabel("Ruh hali: —")
         self._hunger_mood_label.setStyleSheet("font-size: 12px; color: #666;")
-        hunger_layout.addWidget(self._hunger_mood_label)
+        hl.addWidget(self._hunger_mood_label)
 
+        # Yem butonları (her yem türü için)
         feed_row = QHBoxLayout()
-        feed_row.setSpacing(10)
-        self._feed_btn = QPushButton("🥕  Havuç ver")
-        self._feed_btn.setMinimumHeight(40)
-        self._feed_btn.setMinimumWidth(140)
-        self._feed_btn.setStyleSheet(self._button_style())
-        self._feed_btn.clicked.connect(self._on_feed_clicked)
-        feed_row.addWidget(self._feed_btn)
+        feed_row.setSpacing(8)
+        self._feed_buttons = {}
+        for food_key, food in FOODS.items():
+            btn = QPushButton(f"{food.emoji}  {food.display_name} ver")
+            btn.setMinimumHeight(36)
+            btn.setStyleSheet(self._button_style())
+            btn.clicked.connect(lambda _c=False, k=food_key: self._on_feed_clicked(k))
+            feed_row.addWidget(btn)
+            self._feed_buttons[food_key] = btn
+        hl.addLayout(feed_row)
 
         self._feed_status_label = QLabel("")
         self._feed_status_label.setStyleSheet("font-size: 11px; color: #999;")
-        feed_row.addWidget(self._feed_status_label)
-        feed_row.addStretch()
-        hunger_layout.addLayout(feed_row)
+        hl.addWidget(self._feed_status_label)
 
         layout.addWidget(hunger_box)
 
-        # ---- Hızlı komut butonları ----
+        # ---- Envanter ----
+        inv_box = QFrame()
+        inv_box.setStyleSheet(
+            "QFrame { background: #f0f9f0; border: 1px solid #d4e8d4; border-radius: 10px; }"
+        )
+        il = QVBoxLayout(inv_box)
+        il.setContentsMargins(14, 12, 14, 12)
+        il.setSpacing(8)
+
+        ih = QHBoxLayout()
+        it = QLabel("🎒 Envanter")
+        it.setStyleSheet("font-size: 13px; font-weight: 700; color: #555;")
+        ih.addWidget(it)
+        ih.addStretch()
+        il.addLayout(ih)
+
+        # Yem sayıları
+        counts_row = QHBoxLayout()
+        counts_row.setSpacing(16)
+        self._count_labels = {}
+        for food_key, food in FOODS.items():
+            lbl = QLabel(f"{food.emoji} 0")
+            lbl.setStyleSheet("font-size: 16px; font-weight: 600;")
+            counts_row.addWidget(lbl)
+            self._count_labels[food_key] = lbl
+        counts_row.addStretch()
+        il.addLayout(counts_row)
+
+        # Günlük ödül butonu
+        daily_row = QHBoxLayout()
+        self._daily_btn = QPushButton("🎁 Günlük havuç sepeti")
+        self._daily_btn.setMinimumHeight(40)
+        self._daily_btn.setStyleSheet(self._button_style())
+        self._daily_btn.clicked.connect(self._on_daily_clicked)
+        daily_row.addWidget(self._daily_btn)
+
+        self._daily_status_label = QLabel("")
+        self._daily_status_label.setStyleSheet("font-size: 11px; color: #999;")
+        daily_row.addWidget(self._daily_status_label)
+        daily_row.addStretch()
+        il.addLayout(daily_row)
+
+        layout.addWidget(inv_box)
+
+        # ---- Hızlı komutlar ----
         commands_label = QLabel("Hızlı komutlar")
-        commands_label.setStyleSheet("font-size: 13px; font-weight: 600; color: #555; margin-top: 8px;")
+        commands_label.setStyleSheet("font-size: 13px; font-weight: 600; color: #555; margin-top: 4px;")
         layout.addWidget(commands_label)
 
         grid = QGridLayout()
         grid.setSpacing(10)
-
         buttons = [
             ("🚶 Yürü",       "walk"),
             ("🐰 Zıpla",      "happy_jump"),
@@ -139,12 +177,11 @@ class MainTab(QWidget):
             ("💤 Uyu/Uyan",   "toggle_sleep"),
             ("👋 Selamla",    "bubble_wave"),
         ]
-
         for i, (text, action) in enumerate(buttons):
             btn = QPushButton(text)
-            btn.setMinimumHeight(44)
+            btn.setMinimumHeight(42)
             btn.setStyleSheet(self._button_style())
-            btn.clicked.connect(lambda _checked=False, a=action: self._on_command(a))
+            btn.clicked.connect(lambda _c=False, a=action: self._on_command(a))
             grid.addWidget(btn, i // 2, i % 2)
 
         layout.addLayout(grid)
@@ -158,7 +195,7 @@ class MainTab(QWidget):
                 border-radius: 10px;
                 font-size: 14px;
                 font-weight: 500;
-                padding: 8px 16px;
+                padding: 6px 14px;
             }
             QPushButton:hover {
                 background: #f2f2f5;
@@ -192,7 +229,6 @@ class MainTab(QWidget):
     def _on_command(self, action: str) -> None:
         animator = self.haven_app.animator
         window = self.haven_app.window
-
         if action == "walk":
             if not animator._is_walking and not animator._is_sleeping:
                 animator._start_walking()
@@ -205,16 +241,37 @@ class MainTab(QWidget):
         elif action in animator.pet.behaviors:
             animator.trigger_behavior(action)
 
-    def _on_feed_clicked(self) -> None:
+    def _on_feed_clicked(self, food_key: str) -> None:
         animator = self.haven_app.animator
-        if animator.feed():
-            self._feed_status_label.setText("Verildi! ❤️")
-        else:
+        inventory = self.haven_app.inventory
+        if inventory is None:
+            return
+        # Envanterde var mı?
+        if inventory.get(food_key) <= 0:
+            self._feed_status_label.setText(f"{FOODS[food_key].display_name} yok! Günlük ödül al 🎁")
+            return
+        if not animator.can_feed():
             self._feed_status_label.setText("Henüz aç değil, biraz bekle")
+            return
+        # Envanterden düş + yemi ver
+        inventory.consume(food_key)
+        animator.feed(food_key)
+        self._feed_status_label.setText(f"{FOODS[food_key].emoji} verildi!")
+
+    def _on_daily_clicked(self) -> None:
+        added = self.haven_app.claim_daily_reward_if_possible()
+        if not added:
+            self._daily_status_label.setText("Yarın tekrar gel!")
+            return
+        parts = []
+        for food_key, amount in added:
+            parts.append(f"{FOODS[food_key].emoji}×{amount}")
+        self._daily_status_label.setText("Aldın: " + ", ".join(parts))
 
     def _refresh_status(self) -> None:
         animator = self.haven_app.animator
         window = self.haven_app.window
+        inventory = self.haven_app.inventory
 
         # Durum
         if animator.is_sleeping():
@@ -228,7 +285,6 @@ class MainTab(QWidget):
             status = "❤️ Mutlu"
         else:
             status = "😊 Boşta"
-
         self._status_label.setText(f"Durum: {status}")
         self._position_label.setText(f"Konum: X {window.x()}, Y {window.y()}")
 
@@ -236,25 +292,48 @@ class MainTab(QWidget):
         hunger = animator.get_hunger()
         self._hunger_bar.setValue(int(hunger))
         self._hunger_percent_label.setText(f"{int(hunger)}%")
-
         mood = animator.get_hunger_mood()
         mood_labels = {
-            "tok":     ("😊 Tok",     "#8BC34A"),   # yeşil
-            "normal":  ("🙂 Normal",  "#FFC107"),   # sarı
-            "aç":      ("😐 Aç",       "#FF9800"),   # turuncu
-            "çok_aç": ("😟 Çok aç",   "#F44336"),   # kırmızı
+            "tok":     ("😊 Tok",     "#8BC34A"),
+            "normal":  ("🙂 Normal",  "#FFC107"),
+            "aç":      ("😐 Aç",       "#FF9800"),
+            "çok_aç": ("😟 Çok aç",   "#F44336"),
         }
         label_text, bar_color = mood_labels.get(mood, ("—", "#8BC34A"))
         self._hunger_mood_label.setText(f"Ruh hali: {label_text}")
         self._hunger_bar.setStyleSheet(self._hunger_bar_style(bar_color))
 
-        # Yem butonu — cooldown durumu
-        can_feed = animator.can_feed()
-        self._feed_btn.setEnabled(can_feed)
-        if not can_feed:
+        # Yem butonları (cooldown + envanter var mı)
+        can_feed_now = animator.can_feed()
+        for food_key, btn in self._feed_buttons.items():
+            has_stock = inventory is not None and inventory.get(food_key) > 0
+            btn.setEnabled(can_feed_now and has_stock)
+
+        if not can_feed_now:
             elapsed = time.time() - animator.get_last_fed_wall_ts()
             remaining = int((animator.HUNGER_FEED_COOLDOWN_MS / 1000) - elapsed)
-            if remaining > 0:
+            if remaining > 0 and not self._feed_status_label.text().startswith(("🥕", "🍎")):
                 self._feed_status_label.setText(f"Sonraki yem: {remaining}s")
         elif self._feed_status_label.text().startswith("Sonraki yem"):
             self._feed_status_label.setText("")
+
+        # Envanter sayıları
+        if inventory is not None:
+            for food_key, lbl in self._count_labels.items():
+                food = FOODS[food_key]
+                lbl.setText(f"{food.emoji} {inventory.get(food_key)}")
+
+        # Günlük ödül durumu
+        state = self.haven_app.user_settings.settings.get_or_create_pet_state(
+            self.haven_app.current_pet.folder_name
+        )
+        if can_claim_daily_reward(state.last_daily_reward_ts):
+            self._daily_btn.setEnabled(True)
+            if not self._daily_status_label.text().startswith(("Aldın", "Yarın")):
+                self._daily_status_label.setText("Hazır! 🎁")
+        else:
+            self._daily_btn.setEnabled(False)
+            remaining = seconds_until_next_daily(state.last_daily_reward_ts)
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            self._daily_status_label.setText(f"Sonraki: {hours}s {minutes}dk")

@@ -6,10 +6,9 @@ Haven - masaüstü pet uygulaması.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 import time
-from user_settings import UserSettingsStore
-from typing import Optional
+from pathlib import Path
+from typing import Optional, List, Tuple
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
@@ -19,6 +18,10 @@ from pet_loader import list_available_pets, load_pet, Pet
 from animator import Animator
 from overlay import OverlayWindow
 from panel.main_window import PanelWindow
+from user_settings import UserSettingsStore
+from inventory import (
+    Inventory, can_claim_daily_reward, claim_daily_reward, try_happy_jump_reward
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -37,35 +40,42 @@ class HavenApp:
             sys.exit(1)
 
         self.current_pet: Pet = load_pet(self.available_pet_dirs[0])
-        # Kullanıcı ayarlarını yükle
         self.user_settings = UserSettingsStore(USER_SETTINGS_PATH)
 
         self.window = OverlayWindow(size=self.current_pet.display_size)
         self.window.set_menu_builder(self._build_menu)
 
         self.animator = Animator(self.current_pet)
-        # Açlık durumunu geri yükle + offline geçen süreyi uygula
+        # Envanter — _restore_pet_state içinde set edilecek
+        self.inventory: Optional[Inventory] = None
+        # Açlık ve envanter durumunu geri yükle
         self._restore_pet_state()
+
+        # Sinyaller: animator → pencere
         self.animator.frame_changed.connect(self.window.set_pixmap)
         self.animator.offset_changed.connect(self.window.set_y_offset)
         self.animator.position_delta.connect(self.window.move_by)
         self.animator.bubble_requested.connect(self._on_bubble_requested)
+        self.animator.happy_jump_triggered.connect(self._on_happy_jump)
 
+        # Sinyaller: pencere → animator
         self.window.clicked.connect(self._on_pet_clicked)
         self.window.activity_detected.connect(self.animator.notify_activity)
         self.window.walk_blocked.connect(self.animator.on_walk_blocked)
 
         self._place_window_bottom_right()
 
+        # Fare takibi
         self._cursor_timer = QTimer()
         self._cursor_timer.timeout.connect(self._check_cursor_direction)
         self._cursor_timer.start(400)
-        # Kalıcı kayıt zamanlayıcısı - her 30 sn'de bir açlığı diske yaz
+
+        # Kalıcı kayıt — her 30 sn'de bir açlığı diske yaz
         self._save_timer = QTimer()
         self._save_timer.timeout.connect(self._persist_pet_state)
         self._save_timer.start(30000)
 
-        # Panel (henüz açılmadı)
+        # Panel referansı
         self._panel: Optional[PanelWindow] = None
 
         self._setup_tray()
@@ -73,7 +83,6 @@ class HavenApp:
     # ---------------- yardımcı ----------------
 
     def current_pet_icon_path(self) -> Optional[Path]:
-        """Panel penceresinin ikonu için kullanılacak."""
         path = ASSETS_DIR / self.current_pet.folder_name / "idle_open.png"
         return path if path.exists() else None
 
@@ -153,8 +162,10 @@ class HavenApp:
         self.animator.toggle_sleep()
         self._refresh_tray_menu()
 
+    # ---------------- state persist ----------------
+
     def _restore_pet_state(self) -> None:
-        """Mevcut pet için açlık ve son yem zamanını user_settings'ten yükle,
+        """Mevcut pet için açlık, envanter ve son yem zamanını user_settings'ten yükle,
         offline süreye göre açlığı düşür."""
         state = self.user_settings.settings.get_or_create_pet_state(
             self.current_pet.folder_name
@@ -168,6 +179,9 @@ class HavenApp:
             if elapsed > 0:
                 self.animator.apply_offline_hunger_decay(elapsed)
 
+        # Envanter'i kur — PetState.inventory sözlüğünü doğrudan referansla
+        self.inventory = Inventory(state.inventory)
+
     def _persist_pet_state(self) -> None:
         """Şu anki pet durumunu user_settings'e yaz."""
         state = self.user_settings.settings.get_or_create_pet_state(
@@ -176,19 +190,35 @@ class HavenApp:
         state.hunger = self.animator.get_hunger()
         state.last_fed_ts = self.animator.get_last_fed_wall_ts()
         state.last_saved_ts = time.time()
+        # inventory sözlüğü zaten state.inventory referansı — ayrıca yazmaya gerek yok
         self.user_settings.save()
 
-    def _quit(self) -> None:
-        self._persist_pet_state()
-        if self._panel is not None:
-            self._panel.close()
-        self.tray.hide()
-        self.qt_app.quit()
+    # ---------------- envanter ödülleri ----------------
+
+    def _on_happy_jump(self) -> None:
+        """Pamuk mutlu olduğunda envantere havuç düşme şansı."""
+        if self.inventory is None:
+            return
+        if try_happy_jump_reward(self.inventory):
+            self.window.show_bubble("🥕", duration_ms=1800)
+
+    def claim_daily_reward_if_possible(self) -> List[Tuple[str, int]]:
+        """Günlük ödülü envantere ekle. Eklenen öğelerin listesini döner."""
+        if self.inventory is None:
+            return []
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        if not can_claim_daily_reward(state.last_daily_reward_ts):
+            return []
+        added = claim_daily_reward(self.inventory)
+        state.last_daily_reward_ts = time.time()
+        self.user_settings.save()
+        return added
 
     # ---------------- panel ----------------
 
     def _open_panel(self) -> None:
-        """Kontrol panelini aç (yoksa oluştur, varsa öne getir)."""
         if self._panel is None:
             self._panel = PanelWindow(self)
         self._panel.show()
@@ -278,7 +308,7 @@ class HavenApp:
         self.current_pet = new_pet
         self.window.resize(new_pet.display_size, new_pet.display_size)
         self.animator.switch_pet(new_pet)
-        # Yeni pet'in açlık durumunu geri yükle
+        # Yeni pet'in durumunu geri yükle (envanter dahil)
         self._restore_pet_state()
         icon_path = self.current_pet_icon_path()
         if icon_path:
@@ -289,6 +319,13 @@ class HavenApp:
         if self._panel is not None:
             self._panel.close()
             self._panel = None
+
+    def _quit(self) -> None:
+        self._persist_pet_state()
+        if self._panel is not None:
+            self._panel.close()
+        self.tray.hide()
+        self.qt_app.quit()
 
     def run(self) -> int:
         self.window.show()

@@ -2,7 +2,7 @@
 animator.py
 -----------
 Pet motoru: nefes alma, davranışlar, ayrık zıplamalarla yürüme, uyku, baloncuklar,
-fare takibi ve fareden kaçma.
+fare takibi, fareden kaçma, açlık ve beslenme.
 """
 from __future__ import annotations
 
@@ -22,13 +22,15 @@ class Animator(QObject):
     offset_changed = Signal(int)
     position_delta = Signal(int, int)
     bubble_requested = Signal(str)
+    happy_jump_triggered = Signal()  # tıklamayla mutlu zıplama olduğunda
 
     FLOAT_TICK_MS = 33
     CLICK_JUMP_DURATION_MS = 500
     CLICK_JUMP_HEIGHT_PX = 50
+
     # Açlık
     HUNGER_DECAY_PER_MIN: float = 1.0     # dakikada kaç puan düşer
-    HUNGER_FEED_AMOUNT: float = 30.0      # bir yem kaç puan doldurur
+    HUNGER_FEED_AMOUNT: float = 30.0      # (kullanılmıyor; hunger_boost FOODS'tan gelir)
     HUNGER_FEED_COOLDOWN_MS: int = 60000  # yem verildikten sonra bekleme
     HUNGER_MAX: float = 100.0
     HUNGER_MIN: float = 0.0
@@ -80,9 +82,10 @@ class Animator(QObject):
 
         # Kaçma (flee)
         self._last_flee_ms: int = -100000  # başta cooldown'dan geçsin
+
         # Açlık — dışarıdan set edilir (user_settings.py yükler)
         self._hunger: float = 80.0
-        self._last_fed_wall_ts: float = 0.0   # sistem zamanı (time.time())
+        self._last_fed_wall_ts: float = 0.0
         self._hunger_tick_accum_ms: int = 0
 
     # ---------------- yaşam döngüsü ----------------
@@ -123,6 +126,7 @@ class Animator(QObject):
             self._is_click_jumping = True
             self._click_jump_elapsed_ms = 0
             self.bubble_requested.emit("❤️")
+            self.happy_jump_triggered.emit()
             return
 
         if name not in self.pet.behaviors:
@@ -136,7 +140,7 @@ class Animator(QObject):
         self._show_current_frame()
 
     def notify_activity(self) -> None:
-        """SADECE kullanıcı etkileşimi burada çağrılmalı (tıklama, mouse hareketi)."""
+        """SADECE kullanıcı etkileşimi burada çağrılmalı."""
         self._wake_up_if_sleeping()
         self._last_activity_ms = self._tick_elapsed.elapsed()
 
@@ -404,21 +408,17 @@ class Animator(QObject):
         if self._is_walking:
             return
 
-        # 3) Dikey bakma — fare tavşana yatayda yakınsa
-        # (yani "üstünde/altında" ise)
-        VERTICAL_LOOK_HORIZONTAL_TOLERANCE = 80  # yatayda bu kadar yakınsa dikey bakma tetiklenir
-        VERTICAL_LOOK_MIN_DY = 60                # yukarı/aşağı ne kadar uzakta olmalı
+        # 3) Dikey bakma
+        VERTICAL_LOOK_HORIZONTAL_TOLERANCE = 80
+        VERTICAL_LOOK_MIN_DY = 60
 
         if abs(dx) < VERTICAL_LOOK_HORIZONTAL_TOLERANCE:
             if dy < -VERTICAL_LOOK_MIN_DY and self.pet.look_up_pixmap is not None:
-                # Fare çok yukarıda → look_up
                 self._emit_current_frame(self.pet.look_up_pixmap)
                 return
             elif dy > VERTICAL_LOOK_MIN_DY and self.pet.look_down_pixmap is not None:
-                # Fare çok aşağıda → look_down
                 self._emit_current_frame(self.pet.look_down_pixmap)
                 return
-            # Fare tam üstünde ama yakın → idle
             self._emit_current_frame(self.pet.idle_pixmap)
             return
 
@@ -426,13 +426,11 @@ class Animator(QObject):
         new_facing_left = (dx < 0)
         if new_facing_left != self._facing_left:
             self._facing_left = new_facing_left
-        # Her durumda idle frame'ini yeni yönle yay
         self._emit_current_frame(self.pet.idle_pixmap)
 
     def _start_flee(self, cursor_dx: float) -> None:
         """Fareden ters yöne bir hop kaç."""
         fc = self.pet.flee
-        # Fare sağda ise sola kaç, solda ise sağa
         direction = -1 if cursor_dx > 0 else 1
         self._facing_left = (direction == -1)
         self._walk_remaining_distance = float(fc.flee_distance_px)
@@ -440,7 +438,7 @@ class Animator(QObject):
         self._is_walking = True
         self._start_next_hop_if_needed()
 
-        # ---------------- açlık ----------------
+    # ---------------- açlık ----------------
 
     def get_hunger(self) -> float:
         return self._hunger
@@ -459,16 +457,18 @@ class Animator(QObject):
         elapsed_since_feed = (time.time() - self._last_fed_wall_ts) * 1000
         return elapsed_since_feed >= self.HUNGER_FEED_COOLDOWN_MS
 
-    def feed(self) -> bool:
-        """Yem ver. Başarılıysa True döner (cooldown geçtiyse)."""
+    def feed(self, food_key: str = "carrot") -> bool:
+        """Belirli tür yem ver. Başarılıysa True."""
+        from inventory import FOODS  # döngüsel import olmasın diye burada
         if not self.can_feed():
             return False
-        self._hunger = min(self.HUNGER_MAX, self._hunger + self.HUNGER_FEED_AMOUNT)
+        food = FOODS.get(food_key)
+        if food is None:
+            return False
+        self._hunger = min(self.HUNGER_MAX, self._hunger + food.hunger_boost)
         self._last_fed_wall_ts = time.time()
-        # Mutluluk tepkisi
         self._wake_up_if_sleeping()
-        self.bubble_requested.emit("🥕")
-        # Kısa bir zıplama
+        self.bubble_requested.emit(food.bubble_emoji)
         self._is_click_jumping = True
         self._click_jump_elapsed_ms = 0
         return True
@@ -485,8 +485,7 @@ class Animator(QObject):
         return "çok_aç"
 
     def apply_offline_hunger_decay(self, elapsed_seconds: float) -> None:
-        """Uygulama kapalıyken geçen süreye göre açlık düşür.
-        Açılışta bir kez çağrılır."""
+        """Uygulama kapalıyken geçen süreye göre açlık düşür."""
         if elapsed_seconds <= 0:
             return
         decay = (elapsed_seconds / 60.0) * self.HUNGER_DECAY_PER_MIN
