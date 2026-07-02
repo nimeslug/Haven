@@ -41,6 +41,8 @@ class HavenApp:
 
         self.current_pet: Pet = load_pet(self.available_pet_dirs[0])
         self.user_settings = UserSettingsStore(USER_SETTINGS_PATH)
+        # Kullanıcı tercihlerini pet'e uygula (varsa)
+        self._apply_preferences_to_pet()
 
         self.window = OverlayWindow(size=self.current_pet.display_size)
         self.window.set_menu_builder(self._build_menu)
@@ -94,6 +96,52 @@ class HavenApp:
         if state.custom_name.strip():
             return state.custom_name.strip()
         return self.current_pet.name
+    
+    def _apply_preferences_to_pet(self) -> None:
+        """user_settings'teki override'ları çalışma zamanında pet'e uygula.
+        Böylece animator hep 'effective' değerleri okur, kod değişmez."""
+        prefs = self.user_settings.settings.preferences
+        pet = self.current_pet
+
+        if prefs.display_size is not None:
+            pet.display_size = prefs.display_size
+        if prefs.walk_probability is not None:
+            pet.walk.walk_probability = prefs.walk_probability
+        if prefs.sleep_idle_timeout_ms is not None:
+            pet.sleep.idle_timeout_ms = prefs.sleep_idle_timeout_ms
+        if prefs.bubble_min_interval_ms is not None:
+            pet.bubbles.min_interval_ms = prefs.bubble_min_interval_ms
+        if prefs.bubble_max_interval_ms is not None:
+            pet.bubbles.max_interval_ms = prefs.bubble_max_interval_ms
+        if prefs.flee_enabled is not None:
+            pet.flee.enabled = prefs.flee_enabled
+
+    def apply_and_save_preferences(self) -> None:
+        """Panel'den ayar değişince çağrılır: pet'e uygula + diske yaz."""
+        prefs = self.user_settings.settings.preferences
+
+        # Açlık hızı — animator sabiti
+        if prefs.hunger_decay_per_min is not None:
+            self.animator.HUNGER_DECAY_PER_MIN = prefs.hunger_decay_per_min
+
+        # Boyut değişikliği → pet'i yeni boyutla yeniden yükle
+        old_size = self.current_pet.display_size
+        new_size = prefs.display_size if prefs.display_size is not None else old_size
+
+        if new_size != old_size:
+            # Pet'i yeni boyutla yeniden yükle (sprite'lar yeniden ölçeklenir)
+            pet_dir = ASSETS_DIR / self.current_pet.folder_name
+            self._persist_pet_state()  # önce mevcut açlık/envanteri kaydet
+            self.current_pet = load_pet(pet_dir, size_override=new_size)
+            self._apply_preferences_to_pet()
+            self.window.resize(new_size, new_size)
+            self.animator.switch_pet(self.current_pet)
+            self._restore_pet_state()
+        else:
+            # Sadece diğer ayarları uygula
+            self._apply_preferences_to_pet()
+
+        self.user_settings.save()
 
     def set_display_name(self, new_name: str) -> None:
         """Kullanıcı özel isim atadı — kaydet."""
@@ -273,6 +321,9 @@ class HavenApp:
         self.window.show_bubble(emoji, duration_ms=self.current_pet.bubbles.duration_ms)
 
     def _check_cursor_direction(self) -> None:
+        prefs = self.user_settings.settings.preferences
+        if prefs.cursor_tracking_enabled is False:
+            return
         if not self.window.isVisible():
             return
         cursor_pos = QCursor.pos()

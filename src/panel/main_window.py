@@ -14,6 +14,7 @@ from PySide6.QtGui import QFont, QIcon
 
 from panel.tabs.main_tab import MainTab
 from panel.tabs.placeholder_tab import PlaceholderTab
+from panel.tabs.settings_tab import SettingsTab
 
 
 # (Sekme etiketi, tab id — hangi sekme sınıfını kullanacağız)
@@ -96,10 +97,10 @@ class PanelWindow(QMainWindow):
         self._tab_list.setCurrentRow(0)
 
     def _build_tab(self, tab_id: str, label: str) -> QWidget:
-        """Tab id'sine göre uygun widget'ı oluştur."""
         if tab_id == "main":
             return MainTab(self.haven_app)
-        # Diğerleri şimdilik placeholder
+        if tab_id == "settings":
+            return SettingsTab(self.haven_app)
         return PlaceholderTab(label)
 
     def _on_tab_changed(self, index: int) -> None:

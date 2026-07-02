@@ -97,7 +97,7 @@ def _load_pixmap(path: Path, size: int) -> QPixmap:
     )
 
 
-def load_pet(pet_dir: Path) -> Pet:
+def load_pet(pet_dir: Path, size_override: Optional[int] = None) -> Pet:
     config_path = pet_dir / "pet.json"
     if not config_path.exists():
         raise FileNotFoundError(f"pet.json bulunamadı: {pet_dir}")
@@ -105,7 +105,7 @@ def load_pet(pet_dir: Path) -> Pet:
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    size = int(config.get("display_size", 180))
+    size = size_override if size_override is not None else int(config.get("display_size", 180))
     frame_cache: Dict[str, QPixmap] = {}
 
     def get_frame(filename: str) -> QPixmap:
