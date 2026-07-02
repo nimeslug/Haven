@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
@@ -15,6 +16,7 @@ from PySide6.QtGui import QAction, QGuiApplication, QIcon, QCursor
 from pet_loader import list_available_pets, load_pet, Pet
 from animator import Animator
 from overlay import OverlayWindow
+from panel.main_window import PanelWindow
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -24,7 +26,6 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 class HavenApp:
     def __init__(self):
         self.qt_app = QApplication(sys.argv)
-        # ÖNEMLİ: Pencere gizlendiğinde uygulama kapanmasın (tray'de kalsın)
         self.qt_app.setQuitOnLastWindowClosed(False)
 
         self.available_pet_dirs = list_available_pets(ASSETS_DIR)
@@ -49,21 +50,27 @@ class HavenApp:
 
         self._place_window_bottom_right()
 
-        # Fare takip zamanlayıcısı
         self._cursor_timer = QTimer()
         self._cursor_timer.timeout.connect(self._check_cursor_direction)
         self._cursor_timer.start(400)
 
-        # System tray
+        # Panel (henüz açılmadı)
+        self._panel: Optional[PanelWindow] = None
+
         self._setup_tray()
+
+    # ---------------- yardımcı ----------------
+
+    def current_pet_icon_path(self) -> Optional[Path]:
+        """Panel penceresinin ikonu için kullanılacak."""
+        path = ASSETS_DIR / self.current_pet.folder_name / "idle_open.png"
+        return path if path.exists() else None
 
     # ---------------- system tray ----------------
 
     def _setup_tray(self) -> None:
-        """Görev çubuğunda tray ikonu oluştur."""
-        # Tray ikonu için pet'in idle görselini kullan
-        icon_path = ASSETS_DIR / self.current_pet.folder_name / "idle_open.png"
-        icon = QIcon(str(icon_path))
+        icon_path = self.current_pet_icon_path()
+        icon = QIcon(str(icon_path)) if icon_path else QIcon()
 
         self.tray = QSystemTrayIcon(icon, parent=self.qt_app)
         self.tray.setToolTip(f"Haven - {self.current_pet.name}")
@@ -72,17 +79,20 @@ class HavenApp:
         self.tray.show()
 
     def _build_tray_menu(self) -> QMenu:
-        """Tray sağ tık menüsünü oluştur."""
         menu = QMenu()
 
-        # Göster/Gizle
+        panel_action = QAction("⚙️  Kontrol Paneli", menu)
+        panel_action.triggered.connect(self._open_panel)
+        menu.addAction(panel_action)
+
+        menu.addSeparator()
+
         toggle_action = QAction("👁️  Göster / Gizle", menu)
         toggle_action.triggered.connect(self._toggle_visibility)
         menu.addAction(toggle_action)
 
         menu.addSeparator()
 
-        # Uyut / Uyandır
         if self.animator.is_sleeping():
             sleep_action = QAction("🌞  Uyandır", menu)
         else:
@@ -92,7 +102,6 @@ class HavenApp:
 
         menu.addSeparator()
 
-        # Pet değiştir
         pet_submenu = menu.addMenu("🐾  Pet değiştir")
         for pet_dir in self.available_pet_dirs:
             try:
@@ -110,7 +119,6 @@ class HavenApp:
 
         menu.addSeparator()
 
-        # Çıkış
         quit_action = QAction("❌  Çıkış", menu)
         quit_action.triggered.connect(self._quit)
         menu.addAction(quit_action)
@@ -118,16 +126,13 @@ class HavenApp:
         return menu
 
     def _refresh_tray_menu(self) -> None:
-        """Menüyü yeniden inşa et (uyku durumu değişince)."""
         self.tray.setContextMenu(self._build_tray_menu())
 
     def _on_tray_activated(self, reason) -> None:
-        """Tray ikonuna sol tıklandığında göster/gizle."""
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self._toggle_visibility()
 
     def _toggle_visibility(self) -> None:
-        """Pet penceresini göster veya gizle."""
         if self.window.isVisible():
             self.window.hide()
         else:
@@ -138,9 +143,20 @@ class HavenApp:
         self._refresh_tray_menu()
 
     def _quit(self) -> None:
-        """Uygulamayı tamamen kapat."""
+        if self._panel is not None:
+            self._panel.close()
         self.tray.hide()
         self.qt_app.quit()
+
+    # ---------------- panel ----------------
+
+    def _open_panel(self) -> None:
+        """Kontrol panelini aç (yoksa oluştur, varsa öne getir)."""
+        if self._panel is None:
+            self._panel = PanelWindow(self)
+        self._panel.show()
+        self._panel.raise_()
+        self._panel.activateWindow()
 
     # ---------------- konumlandırma ----------------
 
@@ -163,7 +179,6 @@ class HavenApp:
         self.window.show_bubble(emoji, duration_ms=self.current_pet.bubbles.duration_ms)
 
     def _check_cursor_direction(self) -> None:
-        # Pencere gizliyse fare takibi yapma
         if not self.window.isVisible():
             return
         cursor_pos = QCursor.pos()
@@ -174,10 +189,16 @@ class HavenApp:
             pet_center_x, pet_center_y
         )
 
-    # ---------------- pet sağ tık menüsü (tavşan üzerinde) ----------------
+    # ---------------- pet üzerinde sağ tık menüsü ----------------
 
     def _build_menu(self) -> QMenu:
         menu = QMenu()
+
+        panel_action = QAction("⚙️ Kontrol Paneli", menu)
+        panel_action.triggered.connect(self._open_panel)
+        menu.addAction(panel_action)
+
+        menu.addSeparator()
 
         if self.animator.is_sleeping():
             sleep_action = QAction("🌞 Uyandır", menu)
@@ -218,11 +239,15 @@ class HavenApp:
         self.current_pet = new_pet
         self.window.resize(new_pet.display_size, new_pet.display_size)
         self.animator.switch_pet(new_pet)
-        # Tray ikonunu da yeni pet ile güncelle
-        icon_path = ASSETS_DIR / new_pet.folder_name / "idle_open.png"
-        self.tray.setIcon(QIcon(str(icon_path)))
+        icon_path = self.current_pet_icon_path()
+        if icon_path:
+            self.tray.setIcon(QIcon(str(icon_path)))
         self.tray.setToolTip(f"Haven - {new_pet.name}")
         self._refresh_tray_menu()
+        # Panel açıksa kapat, yeni pet ile yeniden oluşturulacak
+        if self._panel is not None:
+            self._panel.close()
+            self._panel = None
 
     def run(self) -> int:
         self.window.show()
