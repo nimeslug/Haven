@@ -73,9 +73,10 @@ class MainTab(QWidget):
             "QFrame { background: #fff8ee; border: 1px solid #f0e0c0; border-radius: 10px; }"
         )
         hl = QVBoxLayout(hunger_box)
-        hl.setContentsMargins(14, 12, 14, 12)
-        hl.setSpacing(8)
+        hl.setContentsMargins(14, 14, 14, 14)
+        hl.setSpacing(10)
 
+        # Başlık satırı
         hh = QHBoxLayout()
         ht = QLabel("🥕 Beslenme")
         ht.setStyleSheet("font-size: 13px; font-weight: 700; color: #555;")
@@ -86,6 +87,7 @@ class MainTab(QWidget):
         hh.addWidget(self._hunger_percent_label)
         hl.addLayout(hh)
 
+        # Progress bar
         self._hunger_bar = QProgressBar()
         self._hunger_bar.setMinimum(0)
         self._hunger_bar.setMaximum(100)
@@ -95,11 +97,12 @@ class MainTab(QWidget):
         self._hunger_bar.setStyleSheet(self._hunger_bar_style("#8BC34A"))
         hl.addWidget(self._hunger_bar)
 
+        # Mood label
         self._hunger_mood_label = QLabel("Ruh hali: —")
         self._hunger_mood_label.setStyleSheet("font-size: 12px; color: #666;")
         hl.addWidget(self._hunger_mood_label)
 
-        # Yem butonları (her yem türü için)
+        # Yem butonları
         feed_row = QHBoxLayout()
         feed_row.setSpacing(8)
         self._feed_buttons = {}
@@ -112,8 +115,10 @@ class MainTab(QWidget):
             self._feed_buttons[food_key] = btn
         hl.addLayout(feed_row)
 
+        # Yem durum yazısı
         self._feed_status_label = QLabel("")
         self._feed_status_label.setStyleSheet("font-size: 11px; color: #999;")
+        self._feed_status_label.setMinimumHeight(16)
         hl.addWidget(self._feed_status_label)
 
         layout.addWidget(hunger_box)
@@ -124,47 +129,46 @@ class MainTab(QWidget):
             "QFrame { background: #f0f9f0; border: 1px solid #d4e8d4; border-radius: 10px; }"
         )
         il = QVBoxLayout(inv_box)
-        il.setContentsMargins(14, 12, 14, 12)
-        il.setSpacing(8)
+        il.setContentsMargins(14, 14, 14, 14)
+        il.setSpacing(10)
 
-        ih = QHBoxLayout()
+        # Başlık
         it = QLabel("🎒 Envanter")
         it.setStyleSheet("font-size: 13px; font-weight: 700; color: #555;")
-        ih.addWidget(it)
-        ih.addStretch()
-        il.addLayout(ih)
+        il.addWidget(it)
 
         # Yem sayıları
         counts_row = QHBoxLayout()
-        counts_row.setSpacing(16)
+        counts_row.setSpacing(20)
         self._count_labels = {}
         for food_key, food in FOODS.items():
-            lbl = QLabel(f"{food.emoji} 0")
-            lbl.setStyleSheet("font-size: 16px; font-weight: 600;")
+            lbl = QLabel(f"{food.emoji}  0")
+            lbl.setStyleSheet("font-size: 16px; font-weight: 600; color: #333;")
             counts_row.addWidget(lbl)
             self._count_labels[food_key] = lbl
         counts_row.addStretch()
         il.addLayout(counts_row)
 
-        # Günlük ödül butonu
+        # Günlük ödül satırı
         daily_row = QHBoxLayout()
+        daily_row.setSpacing(10)
         self._daily_btn = QPushButton("🎁 Günlük havuç sepeti")
-        self._daily_btn.setMinimumHeight(40)
+        self._daily_btn.setMinimumHeight(38)
+        self._daily_btn.setMinimumWidth(200)
         self._daily_btn.setStyleSheet(self._button_style())
         self._daily_btn.clicked.connect(self._on_daily_clicked)
         daily_row.addWidget(self._daily_btn)
 
         self._daily_status_label = QLabel("")
         self._daily_status_label.setStyleSheet("font-size: 11px; color: #999;")
-        daily_row.addWidget(self._daily_status_label)
-        daily_row.addStretch()
+        daily_row.addWidget(self._daily_status_label, 1)
         il.addLayout(daily_row)
 
         layout.addWidget(inv_box)
 
         # ---- Hızlı komutlar ----
         commands_label = QLabel("Hızlı komutlar")
-        commands_label.setStyleSheet("font-size: 13px; font-weight: 600; color: #555; margin-top: 4px;")
+        commands_label.setStyleSheet("font-size: 13px; font-weight: 600; color: #555;")
         layout.addWidget(commands_label)
 
         grid = QGridLayout()

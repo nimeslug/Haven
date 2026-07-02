@@ -32,14 +32,14 @@ FOODS: Dict[str, FoodItem] = {
         key="carrot",
         emoji="🥕",
         display_name="Havuç",
-        hunger_boost=30.0,
+        hunger_boost=8.0,
         bubble_emoji="🥕",
     ),
     "apple": FoodItem(
         key="apple",
         emoji="🍎",
         display_name="Elma",
-        hunger_boost=50.0,
+        hunger_boost=15.0,
         bubble_emoji="🍎",
     ),
 }

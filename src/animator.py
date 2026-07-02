@@ -31,7 +31,7 @@ class Animator(QObject):
     # Açlık
     HUNGER_DECAY_PER_MIN: float = 1.0     # dakikada kaç puan düşer
     HUNGER_FEED_AMOUNT: float = 30.0      # (kullanılmıyor; hunger_boost FOODS'tan gelir)
-    HUNGER_FEED_COOLDOWN_MS: int = 60000  # yem verildikten sonra bekleme
+    HUNGER_FEED_COOLDOWN_MS: int = 30000  # yem verildikten sonra bekleme
     HUNGER_MAX: float = 100.0
     HUNGER_MIN: float = 0.0
 
