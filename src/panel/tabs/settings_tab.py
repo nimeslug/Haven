@@ -22,15 +22,15 @@ class SettingsTab(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { background: transparent; }")
-        outer.addWidget(scroll)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setStyleSheet("QScrollArea { background: transparent; }")
+        outer.addWidget(self._scroll)
 
         self._content = QWidget()
         self._content.setStyleSheet("background: transparent;")
-        scroll.setWidget(self._content)
+        self._scroll.setWidget(self._content)
 
         self._build_ui()
 
@@ -123,7 +123,7 @@ class SettingsTab(QWidget):
         # ---------------- Davranış ----------------
         layout.addWidget(self._make_section_title("🎭 Davranış"))
 
-        # Yürüme sıklığı (%0 – %100)
+        # Yürüme sıklığı
         walk_prob = prefs.walk_probability if prefs.walk_probability is not None else pet.walk.walk_probability
         layout.addWidget(self._make_slider_row(
             "Yürüme sıklığı",
@@ -132,7 +132,7 @@ class SettingsTab(QWidget):
             on_change=lambda v: self._set_pref("walk_probability", v / 100.0),
         ))
 
-        # Uyku süresi (15 sn – 300 sn)
+        # Uyku süresi
         sleep_sec = (prefs.sleep_idle_timeout_ms or pet.sleep.idle_timeout_ms) // 1000
         layout.addWidget(self._make_slider_row(
             "Uykuya girme süresi",
@@ -141,7 +141,7 @@ class SettingsTab(QWidget):
             on_change=lambda v: self._set_pref("sleep_idle_timeout_ms", v * 1000),
         ))
 
-        # Baloncuk sıklığı — min interval'ı ayarlayalım (max otomatik 3x olsun)
+        # Baloncuk sıklığı
         bubble_min_sec = (prefs.bubble_min_interval_ms or pet.bubbles.min_interval_ms) // 1000
         layout.addWidget(self._make_slider_row(
             "Baloncuk sıklığı (min bekleme)",
@@ -150,7 +150,7 @@ class SettingsTab(QWidget):
             on_change=lambda v: self._set_bubble_intervals(v),
         ))
 
-        # Açlık düşme hızı (0.1 – 3.0 puan/dk, slider 1 – 30 kullanıp bölelim)
+        # Açlık düşme hızı
         hunger_rate = prefs.hunger_decay_per_min if prefs.hunger_decay_per_min is not None else 1.0
         layout.addWidget(self._make_slider_row(
             "Açlık düşme hızı",
@@ -226,38 +226,16 @@ class SettingsTab(QWidget):
         self.haven_app.apply_and_save_preferences()
 
     def _on_reset(self) -> None:
-        """Tüm kullanıcı tercihlerini sıfırla."""
+        """Tüm kullanıcı tercihlerini sıfırla ve UI'yi yeniden inşa et."""
         from user_settings import UserPreferences
+
+        # 1) Tercihleri sıfırla ve uygula
         self.haven_app.user_settings.settings.preferences = UserPreferences()
         self.haven_app.apply_and_save_preferences()
-        # UI'yi yeniden inşa et (slider değerleri güncellensin)
-        # Basit yol: sekmeyi tamamen yeniden oluşturmak yerine kullanıcıdan paneli yeniden açmasını isteyelim
-        # ama daha iyisi: mevcut widget'ları temizleyip _build_ui'yi tekrar çağırmak
-        self._rebuild()
 
-    def _rebuild(self) -> None:
-        # Mevcut layout'u temizle
-        old_layout = self._content.layout()
-        if old_layout is not None:
-            while old_layout.count():
-                item = old_layout.takeAt(0)
-                w = item.widget()
-                if w is not None:
-                    w.deleteLater()
-            # QLayout'u bırakıp yenisini oluşturamıyoruz doğrudan; ama _build_ui yeni layout kuracak
-        # En pratik: _content'i yeniden yarat
-        parent = self._content.parent()
-        old = self._content
+        # 2) İçerik alanını yeniden yarat
+        # QScrollArea.setWidget eski widget'ı otomatik siler, güvenli.
         self._content = QWidget()
         self._content.setStyleSheet("background: transparent;")
-        # ScrollArea'yı bul (parent'ın parent'ı outer, aslında self.parent zincirinde scroll var)
-        # Daha temiz: outer layout'taki QScrollArea'yı bul
-        outer = self.layout()
-        if outer is not None and outer.count() > 0:
-            scroll_item = outer.itemAt(0)
-            if scroll_item is not None:
-                scroll = scroll_item.widget()
-                if isinstance(scroll, QScrollArea):
-                    scroll.setWidget(self._content)
-        old.deleteLater()
+        self._scroll.setWidget(self._content)
         self._build_ui()
