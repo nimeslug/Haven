@@ -14,14 +14,12 @@ from typing import Dict
 
 @dataclass
 class PetState:
-    """Bir pet'in kalıcı durumu."""
     hunger: float = 80.0
     last_saved_ts: float = 0.0
     last_fed_ts: float = 0.0
-    # Envanter: yem türü → adet
     inventory: Dict[str, int] = field(default_factory=lambda: {"carrot": 3, "apple": 0})
-    # Günlük ödül son alınış zamanı (UNIX timestamp)
     last_daily_reward_ts: float = 0.0
+    custom_name: str = ""  # boş = default (pet.json'daki) ismi kullan
 
 
 @dataclass
@@ -57,6 +55,7 @@ class UserSettingsStore:
                 # Eksik alanlar için varsayılan
                 state.setdefault("inventory", {"carrot": 3, "apple": 0})
                 state.setdefault("last_daily_reward_ts", 0.0)
+                state.setdefault("custom_name", "")
                 pet_states[name] = PetState(**state)
             return UserSettings(pet_states=pet_states)
         except Exception as e:

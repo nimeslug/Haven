@@ -10,7 +10,7 @@ import time
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QGridLayout, QProgressBar, QScrollArea
+    QGridLayout, QProgressBar, QScrollArea, QInputDialog
 )
 from PySide6.QtGui import QFont
 
@@ -50,13 +50,37 @@ class MainTab(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(14)
 
-        # ---- Başlık ----
-        title = QLabel(f"{self.haven_app.current_pet.emoji}  {self.haven_app.current_pet.name}")
+        # ---- Başlık (isim + düzenle butonu) ----
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+
+        display_name = self.haven_app.get_display_name()
+        self._title_label = QLabel(f"{self.haven_app.current_pet.emoji}  {display_name}")
         tf = QFont()
         tf.setPointSize(20)
         tf.setBold(True)
-        title.setFont(tf)
-        layout.addWidget(title)
+        self._title_label.setFont(tf)
+        title_row.addWidget(self._title_label)
+
+        self._edit_name_btn = QPushButton("✏️")
+        self._edit_name_btn.setToolTip("İsmi düzenle")
+        self._edit_name_btn.setFixedSize(32, 32)
+        self._edit_name_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                font-size: 16px;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background: #eaeaef;
+            }
+        """)
+        self._edit_name_btn.clicked.connect(self._on_edit_name)
+        title_row.addWidget(self._edit_name_btn)
+
+        title_row.addStretch()
+        layout.addLayout(title_row)
 
         subtitle = QLabel(f"{self.haven_app.current_pet.species} · Quick controls")
         subtitle.setStyleSheet("color: #888;")
@@ -288,6 +312,28 @@ class MainTab(QWidget):
         for food_key, amount in added:
             parts.append(f"{FOODS[food_key].emoji}×{amount}")
         self._daily_status_label.setText("Aldın: " + ", ".join(parts))
+
+    def _on_edit_name(self) -> None:
+        """İsim düzenleme diyaloğu göster."""
+        from PySide6.QtWidgets import QInputDialog
+
+        current = self.haven_app.get_display_name()
+        default_name = self.haven_app.current_pet.name
+        new_name, ok = QInputDialog.getText(
+            self,
+            "İsmi düzenle",
+            f"Yeni isim (boş bırakırsan varsayılana döner: {default_name})",
+            text=current,
+        )
+        if not ok:
+            return
+
+        self.haven_app.set_display_name(new_name)
+
+        # Başlığı hemen güncelle
+        display = self.haven_app.get_display_name()
+        emoji = self.haven_app.current_pet.emoji
+        self._title_label.setText(f"{emoji}  {display}")
 
     def _refresh_status(self) -> None:
         animator = self.haven_app.animator

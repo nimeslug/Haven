@@ -34,7 +34,7 @@ class PanelWindow(QMainWindow):
         super().__init__()
         self.haven_app = haven_app
 
-        self.setWindowTitle("Haven — Kontrol Paneli")
+        self.setWindowTitle(f"Haven — {haven_app.get_display_name()}")
         self.resize(820, 680)
         self.setMinimumSize(720, 600)
 

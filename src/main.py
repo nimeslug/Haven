@@ -85,6 +85,33 @@ class HavenApp:
     def current_pet_icon_path(self) -> Optional[Path]:
         path = ASSETS_DIR / self.current_pet.folder_name / "idle_open.png"
         return path if path.exists() else None
+    
+    def get_display_name(self) -> str:
+        """Pet'in gösterim ismini döndürür (kullanıcı verdiyse onu, yoksa default)."""
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        if state.custom_name.strip():
+            return state.custom_name.strip()
+        return self.current_pet.name
+
+    def set_display_name(self, new_name: str) -> None:
+        """Kullanıcı özel isim atadı — kaydet."""
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        new_name = new_name.strip()
+        # Boş veya default ile aynıysa custom_name'i temizle
+        if not new_name or new_name == self.current_pet.name:
+            state.custom_name = ""
+        else:
+            state.custom_name = new_name
+        self.user_settings.save()
+        # Bağlı olan her yeri güncelle
+        display = self.get_display_name()
+        self.tray.setToolTip(f"Haven - {display}")
+        if self._panel is not None:
+            self._panel.setWindowTitle(f"Haven — {display}")
 
     # ---------------- system tray ----------------
 
@@ -93,7 +120,7 @@ class HavenApp:
         icon = QIcon(str(icon_path)) if icon_path else QIcon()
 
         self.tray = QSystemTrayIcon(icon, parent=self.qt_app)
-        self.tray.setToolTip(f"Haven - {self.current_pet.name}")
+        self.tray.setToolTip(f"Haven - {self.get_display_name()}")
         self.tray.setContextMenu(self._build_tray_menu())
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
@@ -313,7 +340,7 @@ class HavenApp:
         icon_path = self.current_pet_icon_path()
         if icon_path:
             self.tray.setIcon(QIcon(str(icon_path)))
-        self.tray.setToolTip(f"Haven - {new_pet.name}")
+        self.tray.setToolTip(f"Haven - {self.get_display_name()}")
         self._refresh_tray_menu()
         # Panel açıksa kapat, yeni pet ile yeniden oluşturulacak
         if self._panel is not None:
