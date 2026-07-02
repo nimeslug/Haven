@@ -227,14 +227,10 @@ class SettingsTab(QWidget):
 
     def _on_reset(self) -> None:
         """Tüm kullanıcı tercihlerini sıfırla ve UI'yi yeniden inşa et."""
-        from user_settings import UserPreferences
-
-        # 1) Tercihleri sıfırla ve uygula
-        self.haven_app.user_settings.settings.preferences = UserPreferences()
-        self.haven_app.apply_and_save_preferences()
+        # 1) HavenApp'in reset metodunu çağır (pet'i default'a döndürür)
+        self.haven_app.reset_preferences_to_defaults()
 
         # 2) İçerik alanını yeniden yarat
-        # QScrollArea.setWidget eski widget'ı otomatik siler, güvenli.
         self._content = QWidget()
         self._content.setStyleSheet("background: transparent;")
         self._scroll.setWidget(self._content)

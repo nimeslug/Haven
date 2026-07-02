@@ -143,6 +143,37 @@ class HavenApp:
 
         self.user_settings.save()
 
+    def reset_preferences_to_defaults(self) -> None:
+        """Tüm kullanıcı tercihlerini sıfırla ve pet'i pet.json'dan yeniden yükle."""
+        from user_settings import UserPreferences
+
+        # 1) Preferences'i tamamen sıfırla
+        self.user_settings.settings.preferences = UserPreferences()
+
+        # 2) Açlık düşme hızını default'a döndür (Animator sabiti)
+        self.animator.HUNGER_DECAY_PER_MIN = 1.0
+
+        # 3) Pet'i pet.json'dan yeniden yükle (tüm değerler default'a döner)
+        pet_dir = ASSETS_DIR / self.current_pet.folder_name
+        old_size = self.current_pet.display_size
+
+        # Önce mevcut durumu kaydet
+        self._persist_pet_state()
+
+        self.current_pet = load_pet(pet_dir)
+        new_size = self.current_pet.display_size
+
+        # Boyut değiştiyse pencereyi resize et
+        if new_size != old_size:
+            self.window.resize(new_size, new_size)
+
+        # Animator'ı yeni pet ile besle
+        self.animator.switch_pet(self.current_pet)
+        self._restore_pet_state()
+
+        # Diske yaz
+        self.user_settings.save()
+
     def set_display_name(self, new_name: str) -> None:
         """Kullanıcı özel isim atadı — kaydet."""
         state = self.user_settings.settings.get_or_create_pet_state(
