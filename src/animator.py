@@ -31,9 +31,13 @@ class Animator(QObject):
     # Açlık
     HUNGER_DECAY_PER_MIN: float = 1.0     # dakikada kaç puan düşer
     HUNGER_FEED_AMOUNT: float = 30.0      # (kullanılmıyor; hunger_boost FOODS'tan gelir)
-    HUNGER_FEED_COOLDOWN_MS: int = 30000  # yem verildikten sonra bekleme
+    HUNGER_FEED_COOLDOWN_MS: int = 15000  # 15 sn — sadece spam koruması
     HUNGER_MAX: float = 100.0
     HUNGER_MIN: float = 0.0
+
+    # Açlık baloncuğu aralıkları
+    HUNGRY_BUBBLE_INTERVAL_MS: int = 45000        # aç (20-40) — 45 sn'de bir 🥕
+    VERY_HUNGRY_BUBBLE_INTERVAL_MS: int = 25000   # çok aç (<20) — 25 sn'de bir 🥺
 
     def __init__(self, pet: Pet, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -87,6 +91,7 @@ class Animator(QObject):
         self._hunger: float = 80.0
         self._last_fed_wall_ts: float = 0.0
         self._hunger_tick_accum_ms: int = 0
+        self._hunger_bubble_last_ms: int = 0
 
     # ---------------- yaşam döngüsü ----------------
 
@@ -206,6 +211,19 @@ class Animator(QObject):
         if self._hunger_tick_accum_ms >= 60000:
             self._hunger_tick_accum_ms -= 60000
             self._hunger = max(self.HUNGER_MIN, self._hunger - self.HUNGER_DECAY_PER_MIN)
+
+        # Açlık baloncuğu — sadece uyanıkken, meşgul değilken
+        if (not self._is_sleeping and not self._is_walking
+                and self._current_behavior is None and not self._is_click_jumping):
+            mood = self.get_hunger_mood()
+            if mood == "çok_aç":
+                if now - self._hunger_bubble_last_ms >= self.VERY_HUNGRY_BUBBLE_INTERVAL_MS:
+                    self.bubble_requested.emit("🥺")
+                    self._hunger_bubble_last_ms = now
+            elif mood == "aç":
+                if now - self._hunger_bubble_last_ms >= self.HUNGRY_BUBBLE_INTERVAL_MS:
+                    self.bubble_requested.emit("🥕")
+                    self._hunger_bubble_last_ms = now
 
         self._check_sleep_transition(now)
 
