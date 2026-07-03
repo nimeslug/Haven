@@ -140,3 +140,40 @@ def try_happy_jump_reward(inventory: Inventory) -> bool:
         inventory.add("carrot", 1)
         return True
     return False
+
+# Streak bonus eşikleri (art arda gün sayısı → ekstra ödüller)
+STREAK_BONUSES = [
+    (3,  "carrot", 2),      # 3 gün → +2 havuç
+    (7,  "apple", 1),       # 7 gün → +1 elma
+    (14, "strawberry", 2),  # 14 gün → +2 çilek
+    (30, "daisy", 1),       # 30 gün → +1 papatya
+]
+
+
+def calculate_streak_bonus(streak_count: int) -> List[Tuple[str, int]]:
+    """Streak seviyesine göre ekstra ödülleri hesapla.
+    Sadece o gün için geçerli eşikleri döner.
+    Örneğin streak 7 ise → 3 ve 7 eşiklerinin bonusları gelir."""
+    bonuses = []
+    for threshold, food_key, amount in STREAK_BONUSES:
+        if streak_count >= threshold:
+            bonuses.append((food_key, amount))
+    return bonuses
+
+
+def update_streak(last_claim_ts: float, current_streak: int) -> int:
+    """Yeni streak sayısını hesapla.
+
+    - Aynı gün ise (24 saatten az) → değişmez (zaten alınmıştı)
+    - 24-48 saat arası → streak +1 (art arda)
+    - 48 saat üstü → streak sıfırlanır, yeniden 1'den başlar
+    """
+    elapsed = time.time() - last_claim_ts
+    if elapsed < DAY_SECONDS:
+        # Aynı gün — bu durum can_claim_daily_reward tarafından zaten engelleniyor
+        return current_streak
+    if elapsed < DAY_SECONDS * 2:
+        # Art arda gün
+        return current_streak + 1
+    # Ara verdi
+    return 1

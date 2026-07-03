@@ -22,6 +22,8 @@ class PetState:
         "carrot": 3, "apple": 0, "strawberry": 0, "daisy": 0
     })
     last_daily_reward_ts: float = 0.0
+    streak_count: int = 0                     # kaç gündür üst üste giriyor
+    max_streak_count: int = 0                 # en yüksek streak (istatistik için)
     custom_name: str = ""
 
 
@@ -84,6 +86,8 @@ class UserSettingsStore:
                 state.setdefault("inventory", {"carrot": 3, "apple": 0})
                 state.setdefault("last_daily_reward_ts", 0.0)
                 state.setdefault("custom_name", "")
+                state.setdefault("streak_count", 0)
+                state.setdefault("max_streak_count", 0)
                 pet_states[name] = PetState(**state)
 
             # Preferences

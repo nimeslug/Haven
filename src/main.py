@@ -309,7 +309,9 @@ class HavenApp:
             self.window.show_bubble("🥕", duration_ms=1800)
 
     def claim_daily_reward_if_possible(self) -> List[Tuple[str, int]]:
-        """Günlük ödülü envantere ekle. Eklenen öğelerin listesini döner."""
+        """Günlük ödülü + streak bonusunu envantere ekle."""
+        from inventory import calculate_streak_bonus, update_streak
+
         if self.inventory is None:
             return []
         state = self.user_settings.settings.get_or_create_pet_state(
@@ -317,7 +319,26 @@ class HavenApp:
         )
         if not can_claim_daily_reward(state.last_daily_reward_ts):
             return []
+
+        # Streak'i güncelle (ilk giriş için first_claim durumunu ele al)
+        if state.last_daily_reward_ts == 0.0:
+            # İlk kez claim ediyor
+            new_streak = 1
+        else:
+            new_streak = update_streak(state.last_daily_reward_ts, state.streak_count)
+
+        state.streak_count = new_streak
+        state.max_streak_count = max(state.max_streak_count, new_streak)
+
+        # Normal günlük ödül
         added = claim_daily_reward(self.inventory)
+
+        # Streak bonusları
+        streak_bonuses = calculate_streak_bonus(new_streak)
+        for food_key, amount in streak_bonuses:
+            self.inventory.add(food_key, amount)
+            added.append((food_key, amount))
+
         state.last_daily_reward_ts = time.time()
         self.user_settings.save()
         return added

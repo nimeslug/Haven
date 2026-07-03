@@ -72,6 +72,38 @@ class InventoryTab(QWidget):
         line.setStyleSheet("color: #ddd;")
         layout.addWidget(line)
 
+        # ---- Streak göstergesi ----
+        streak_box = QFrame()
+        streak_box.setStyleSheet(
+            "QFrame { background: #ffece0; border: 1px solid #ffcaa0; border-radius: 10px; }"
+        )
+        sl = QHBoxLayout(streak_box)
+        sl.setContentsMargins(14, 12, 14, 12)
+        sl.setSpacing(12)
+
+        streak_title = QLabel("🔥 Günlük seri")
+        streak_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #b0623a;")
+        sl.addWidget(streak_title)
+        sl.addStretch()
+
+        self._streak_label = QLabel("0 gün")
+        self._streak_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #d0703a;")
+        sl.addWidget(self._streak_label)
+
+        self._streak_max_label = QLabel("(En yüksek: 0)")
+        self._streak_max_label.setStyleSheet("font-size: 11px; color: #a07050;")
+        sl.addWidget(self._streak_max_label)
+
+        layout.addWidget(streak_box)
+
+        # Bonus eşiklerini göster
+        bonus_hint = QLabel(
+            "🎯 Bonus eşikleri: 3g → +2🥕  ·  7g → +1🍎  ·  14g → +2🍓  ·  30g → +1🌸"
+        )
+        bonus_hint.setStyleSheet("font-size: 10px; color: #999; margin-bottom: 4px;")
+        bonus_hint.setWordWrap(True)
+        layout.addWidget(bonus_hint)
+
         # ---- Günlük ödül ----
         daily_box = QFrame()
         daily_box.setStyleSheet(
@@ -243,6 +275,13 @@ class InventoryTab(QWidget):
         inventory = self.haven_app.inventory
         if inventory is None:
             return
+        
+        # Streak göstergesi güncelle
+        state = self.haven_app.user_settings.settings.get_or_create_pet_state(
+            self.haven_app.current_pet.folder_name
+        )
+        self._streak_label.setText(f"{state.streak_count} gün")
+        self._streak_max_label.setText(f"(En yüksek: {state.max_streak_count})")
 
         # Sayıları güncelle
         for food_key, lbl in self._count_labels.items():
