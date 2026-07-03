@@ -2,7 +2,6 @@
 inventory.py
 ------------
 Yem envanteri ve beslenme kuralları.
-Merkezi bir yerden yem türleri, etkileri, ödülleri yönetilir.
 """
 from __future__ import annotations
 
@@ -12,21 +11,21 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 
-# Bir gün = 24 saat (saniye cinsinden)
 DAY_SECONDS = 24 * 60 * 60
 
 
 @dataclass(frozen=True)
 class FoodItem:
-    """Bir yem türünün tanımı."""
-    key: str                # "carrot", "apple"
-    emoji: str              # 🥕, 🍎
-    display_name: str       # "Havuç", "Elma"
-    hunger_boost: float     # açlığa etkisi
-    bubble_emoji: str       # yendiğinde çıkan baloncuk
+    key: str
+    emoji: str
+    display_name: str
+    hunger_boost: float
+    bubble_emoji: str
+    description: str
+    rarity_label: str
 
 
-# Merkezi yem kataloğu
+# Yem kataloğu
 FOODS: Dict[str, FoodItem] = {
     "carrot": FoodItem(
         key="carrot",
@@ -34,6 +33,17 @@ FOODS: Dict[str, FoodItem] = {
         display_name="Havuç",
         hunger_boost=8.0,
         bubble_emoji="🥕",
+        description="Pamuk'un baş yemeği. Bol miktarda bulunur, hafif atıştırmalık.",
+        rarity_label="Yaygın",
+    ),
+    "strawberry": FoodItem(
+        key="strawberry",
+        emoji="🍓",
+        display_name="Çilek",
+        hunger_boost=12.0,
+        bubble_emoji="🍓",
+        description="Tatlı meyveler moral yükseltir. Yedikten sonra mutlu olur.",
+        rarity_label="Yaygın",
     ),
     "apple": FoodItem(
         key="apple",
@@ -41,25 +51,33 @@ FOODS: Dict[str, FoodItem] = {
         display_name="Elma",
         hunger_boost=15.0,
         bubble_emoji="🍎",
+        description="Besleyici ve doyurucu. Uzun süre tok tutar.",
+        rarity_label="Az bulunur",
+    ),
+    "daisy": FoodItem(
+        key="daisy",
+        emoji="🌸",
+        display_name="Papatya",
+        hunger_boost=5.0,
+        bubble_emoji="🌸",
+        description="Fazla besleyici değil ama çok özel. Süper mutluluk verir.",
+        rarity_label="Nadir",
     ),
 }
 
 
-# Günlük ödül miktarları
-DAILY_REWARD_CARROTS = 3
-DAILY_REWARD_APPLE_CHANCE = 0.3      # %30
-HAPPY_JUMP_CARROT_CHANCE = 0.15      # %15
+# Günlük ödül dağılımı — bereketli sürüm
+DAILY_REWARD_CARROTS = 6
+DAILY_REWARD_STRAWBERRIES = 2
+DAILY_REWARD_APPLE_CHANCE = 0.6
+DAILY_REWARD_DAISY_CHANCE = 0.25
+HAPPY_JUMP_CARROT_CHANCE = 0.2
 
 
 class Inventory:
-    """Bir pet'in envanterini yönetir.
-
-    Değerler PetState.inventory sözlüğüne yansır — burada direkt referansla çalışıyoruz,
-    böylece save/load sırasında ek dönüşüm gerekmez.
-    """
+    """Bir pet'in envanterini yönetir."""
 
     def __init__(self, inventory_dict: Dict[str, int]):
-        # Eksik anahtarları sıfırla doldur
         for key in FOODS:
             inventory_dict.setdefault(key, 0)
         self._data = inventory_dict
@@ -73,7 +91,6 @@ class Inventory:
         self._data[food_key] = self.get(food_key) + amount
 
     def consume(self, food_key: str) -> bool:
-        """Bir tane yem tüket. Yeterli varsa True döner."""
         if self.get(food_key) <= 0:
             return False
         self._data[food_key] -= 1
@@ -84,31 +101,41 @@ class Inventory:
 
 
 def can_claim_daily_reward(last_claim_ts: float) -> bool:
-    """Günlük ödül alınabilir mi? (Son ödülden bu yana 24 saat geçti mi?)"""
     return (time.time() - last_claim_ts) >= DAY_SECONDS
 
 
 def seconds_until_next_daily(last_claim_ts: float) -> int:
-    """Sonraki günlük ödüle kaç saniye kaldı? (0 = hazır)"""
     remaining = DAY_SECONDS - (time.time() - last_claim_ts)
     return max(0, int(remaining))
 
 
 def claim_daily_reward(inventory: Inventory) -> List[Tuple[str, int]]:
-    """Günlük ödülü envanter'e ekle. Eklenen öğelerin listesini döner.
-    Örn: [("carrot", 3), ("apple", 1)]
-    """
+    """Günlük ödülü envanter'e ekle."""
     added = []
+
+    # Havuç (garanti)
     inventory.add("carrot", DAILY_REWARD_CARROTS)
     added.append(("carrot", DAILY_REWARD_CARROTS))
+
+    # Çilek (garanti)
+    inventory.add("strawberry", DAILY_REWARD_STRAWBERRIES)
+    added.append(("strawberry", DAILY_REWARD_STRAWBERRIES))
+
+    # Elma (%60 şans)
     if random.random() < DAILY_REWARD_APPLE_CHANCE:
         inventory.add("apple", 1)
         added.append(("apple", 1))
+
+    # Papatya (%25 şans, o da tuttuysa %20 ihtimalle 2 tane)
+    if random.random() < DAILY_REWARD_DAISY_CHANCE:
+        amount = 2 if random.random() < 0.2 else 1
+        inventory.add("daisy", amount)
+        added.append(("daisy", amount))
+
     return added
 
 
 def try_happy_jump_reward(inventory: Inventory) -> bool:
-    """Mutlu zıplamayla havuç kazanma şansı. Kazanılırsa True."""
     if random.random() < HAPPY_JUMP_CARROT_CHANCE:
         inventory.add("carrot", 1)
         return True

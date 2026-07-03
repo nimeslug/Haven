@@ -18,7 +18,9 @@ class PetState:
     hunger: float = 80.0
     last_saved_ts: float = 0.0
     last_fed_ts: float = 0.0
-    inventory: Dict[str, int] = field(default_factory=lambda: {"carrot": 3, "apple": 0})
+    inventory: Dict[str, int] = field(default_factory=lambda: {
+        "carrot": 3, "apple": 0, "strawberry": 0, "daisy": 0
+    })
     last_daily_reward_ts: float = 0.0
     custom_name: str = ""
 
@@ -57,7 +59,7 @@ class UserSettings:
                 hunger=80.0,
                 last_saved_ts=time.time(),
                 last_fed_ts=0.0,
-                inventory={"carrot": 3, "apple": 0},
+                inventory={"carrot": 3, "apple": 0, "strawberry": 0, "daisy": 0},
                 last_daily_reward_ts=0.0,
             )
         return self.pet_states[folder_name]
