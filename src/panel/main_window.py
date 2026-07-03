@@ -15,6 +15,7 @@ from PySide6.QtGui import QFont, QIcon
 from panel.tabs.main_tab import MainTab
 from panel.tabs.placeholder_tab import PlaceholderTab
 from panel.tabs.settings_tab import SettingsTab
+from panel.tabs.inventory_tab import InventoryTab
 
 
 # (Sekme etiketi, tab id — hangi sekme sınıfını kullanacağız)
@@ -22,6 +23,7 @@ TABS = [
     ("🐾  Ana",           "main"),
     ("⚙️  Ayarlar",       "settings"),
     ("🎨  Görünüm",       "appearance"),
+    ("🎒  Envanter",      "inventory"),
     ("💬  Sohbet",        "chat"),
     ("⏰  Hatırlatıcılar", "reminders"),
     ("ℹ️  Hakkında",      "about"),
@@ -101,6 +103,8 @@ class PanelWindow(QMainWindow):
             return MainTab(self.haven_app)
         if tab_id == "settings":
             return SettingsTab(self.haven_app)
+        if tab_id == "inventory":
+            return InventoryTab(self.haven_app)
         return PlaceholderTab(label)
 
     def _on_tab_changed(self, index: int) -> None:
