@@ -76,6 +76,32 @@ class InventoryTab(QWidget):
         # ---- Günlük ödül ----
         daily_box = QFrame()
 
+        # ---- İpuçları ----
+        tips_box = QFrame()
+        tips_box.setStyleSheet(
+            "QFrame { background: #eef5ff; border: 1px solid #c8d8ee; border-radius: 10px; }"
+        )
+        tl = QVBoxLayout(tips_box)
+        tl.setContentsMargins(14, 10, 14, 10)
+        tl.setSpacing(4)
+
+        tips_title = QLabel("💡 Yem kazanmanın yolları")
+        tips_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #4a6ea0;")
+        tl.addWidget(tips_title)
+
+        tips_text = QLabel(
+            "🎁 <b>Günlük sepet:</b> Her gün al, seri oluştur → bonus ödüller  ·  "
+            "❤️ <b>Mutlu et:</b> Pamuk'a tıkla, %20 şans havuç düşer  ·  "
+            "🚶 <b>Yürüme sonu:</b> %20 şans havuç bulur  ·  "
+            "👀 <b>Etrafa bakış:</b> %30 şans havuç bulur"
+        )
+        tips_text.setStyleSheet("font-size: 11px; color: #556788; line-height: 150%;")
+        tips_text.setWordWrap(True)
+        tips_text.setTextFormat(Qt.TextFormat.RichText)
+        tl.addWidget(tips_text)
+
+        layout.addWidget(tips_box)
+
         # ---- Streak göstergesi ----
         streak_box = QFrame()
         streak_box.setStyleSheet(

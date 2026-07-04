@@ -16,6 +16,7 @@ from panel.tabs.main_tab import MainTab
 from panel.tabs.placeholder_tab import PlaceholderTab
 from panel.tabs.settings_tab import SettingsTab
 from panel.tabs.inventory_tab import InventoryTab
+from panel.tabs.about_tab import AboutTab
 
 
 # (Sekme etiketi, tab id — hangi sekme sınıfını kullanacağız)
@@ -105,6 +106,8 @@ class PanelWindow(QMainWindow):
             return SettingsTab(self.haven_app)
         if tab_id == "inventory":
             return InventoryTab(self.haven_app)
+        if tab_id == "about":
+            return AboutTab(self.haven_app)
         return PlaceholderTab(label)
 
     def _on_tab_changed(self, index: int) -> None:
