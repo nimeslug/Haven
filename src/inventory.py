@@ -75,6 +75,7 @@ HAPPY_JUMP_CARROT_CHANCE = 0.2
 # Rastgele bulma şansları (Pamuk kendi kendine yem bulur)
 WALK_END_CARROT_CHANCE = 0.20      # yürümenin sonunda %20
 LOOK_AROUND_CARROT_CHANCE = 0.30   # look_around davranışı sonunda %30
+LOOK_AROUND_DAISY_CHANCE = 0.05     # look_around sırasında %5 şansla papatya
 
 
 class Inventory:
@@ -185,5 +186,12 @@ def try_random_find(inventory: Inventory, chance: float) -> bool:
     """Belirli şansla envantere havuç ekle. Bulduysa True."""
     if random.random() < chance:
         inventory.add("carrot", 1)
+        return True
+    return False
+
+def try_look_around_daisy(inventory: Inventory) -> bool:
+    """Look_around sırasında ekstra papatya bulma şansı."""
+    if random.random() < LOOK_AROUND_DAISY_CHANCE:
+        inventory.add("daisy", 1)
         return True
     return False

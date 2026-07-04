@@ -93,7 +93,7 @@ class InventoryTab(QWidget):
             "🎁 <b>Günlük sepet:</b> Her gün al, seri oluştur → bonus ödüller  ·  "
             "❤️ <b>Mutlu et:</b> Pamuk'a tıkla, %20 şans havuç düşer  ·  "
             "🚶 <b>Yürüme sonu:</b> %20 şans havuç bulur  ·  "
-            "👀 <b>Etrafa bakış:</b> %30 şans havuç bulur"
+            "👀 <b>Etrafa bakış:</b> %30 şans havuç, %5 şans papatya 🌸"
         )
         tips_text.setStyleSheet("font-size: 11px; color: #556788; line-height: 150%;")
         tips_text.setWordWrap(True)

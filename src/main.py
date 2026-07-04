@@ -51,6 +51,9 @@ class HavenApp:
         self.inventory: Optional[Inventory] = None
         self._restore_pet_state()
 
+        # Günlük görevleri yenile (yeni gün geldiyse)
+        self._refresh_daily_quests_if_needed()
+
         # Sinyaller: animator → pencere
         self.animator.frame_changed.connect(self.window.set_pixmap)
         self.animator.offset_changed.connect(self.window.set_y_offset)
@@ -287,12 +290,35 @@ class HavenApp:
             self.window.show_bubble("🥕", duration_ms=2000)
 
     def _on_behavior_ended(self, behavior_name: str) -> None:
-        """Belirli davranışların sonunda rastgele havuç bulma şansı."""
+        """Belirli davranışların sonunda rastgele havuç veya çiçek bulma şansı."""
         if self.inventory is None:
             return
         if behavior_name == "look_around":
-            if try_random_find(self.inventory, LOOK_AROUND_CARROT_CHANCE):
+            # Önce papatya şansı (nadir), sonra havuç şansı
+            from inventory import try_look_around_daisy
+            if try_look_around_daisy(self.inventory):
+                self.window.show_bubble("🌸", duration_ms=2500)
+            elif try_random_find(self.inventory, LOOK_AROUND_CARROT_CHANCE):
                 self.window.show_bubble("🥕", duration_ms=2000)
+
+    def _refresh_daily_quests_if_needed(self) -> None:
+        """Yeni gün geldiyse görevleri yenile."""
+        from quests import should_regenerate_quests, generate_daily_quests, today_str
+
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        if should_regenerate_quests(state.quests_generated_date):
+            state.daily_quests = generate_daily_quests(count=3)
+            state.quests_generated_date = today_str()
+            self.user_settings.save()
+
+    def get_daily_quests(self) -> list:
+        """Panel'in kullanacağı: aktif görevler."""
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        return state.daily_quests
 
     def claim_daily_reward_if_possible(self) -> List[Tuple[str, int]]:
         """Günlük ödülü + streak bonusunu envantere ekle."""

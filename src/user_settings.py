@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 
 @dataclass
@@ -19,11 +20,13 @@ class PetState:
     last_saved_ts: float = 0.0
     last_fed_ts: float = 0.0
     inventory: Dict[str, int] = field(default_factory=lambda: {
-        "carrot": 3, "apple": 0, "strawberry": 0, "daisy": 0
+        "carrot": 5, "strawberry": 3, "apple": 2, "daisy": 1
     })
     last_daily_reward_ts: float = 0.0
     streak_count: int = 0                     # kaç gündür üst üste giriyor
-    max_streak_count: int = 0                 # en yüksek streak (istatistik için)
+    max_streak_count: int = 0   
+    daily_quests: List[dict] = field(default_factory=list)  # o günkü aktif görevler
+    quests_generated_date: str = ""                          # görevlerin üretildiği gün (YYYY-MM-DD)              # en yüksek streak (istatistik için)
     custom_name: str = ""
 
 
@@ -61,7 +64,7 @@ class UserSettings:
                 hunger=80.0,
                 last_saved_ts=time.time(),
                 last_fed_ts=0.0,
-                inventory={"carrot": 3, "apple": 0, "strawberry": 0, "daisy": 0},
+                inventory={"carrot": 8, "strawberry": 4, "apple": 2, "daisy": 3},
                 last_daily_reward_ts=0.0,
             )
         return self.pet_states[folder_name]
@@ -88,6 +91,8 @@ class UserSettingsStore:
                 state.setdefault("custom_name", "")
                 state.setdefault("streak_count", 0)
                 state.setdefault("max_streak_count", 0)
+                state.setdefault("daily_quests", [])
+                state.setdefault("quests_generated_date", "")
                 pet_states[name] = PetState(**state)
 
             # Preferences
