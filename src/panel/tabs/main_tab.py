@@ -376,13 +376,21 @@ class MainTab(QWidget):
             has_stock = inventory is not None and inventory.get(food_key) > 0
             btn.setEnabled(can_feed_now and has_stock)
 
+        # Cooldown süre göstergesi
         if not can_feed_now:
             elapsed = time.time() - animator.get_last_fed_wall_ts()
             remaining = int((animator.HUNGER_FEED_COOLDOWN_MS / 1000) - elapsed)
-            if remaining > 0 and not self._feed_status_label.text().startswith(("🥕", "🍎")):
-                self._feed_status_label.setText(f"Sonraki yem: {remaining}s")
-        elif self._feed_status_label.text().startswith("Sonraki yem"):
-            self._feed_status_label.setText("")
+            if remaining > 0:
+                # Cooldown yazısı — mevcut "verildi" yazısını 2 sn sonra geçersiz kılar
+                current_text = self._feed_status_label.text()
+                if current_text.startswith(("🥕", "🍓", "🍎", "🌸")) and elapsed < 2:
+                    pass  # ilk 2 sn "verildi!" görünsün
+                else:
+                    self._feed_status_label.setText(f"⏳ Sonraki yem: {remaining}s")
+        else:
+            # Cooldown bitti, geriye kalan sayaç metnini temizle
+            if self._feed_status_label.text().startswith("⏳"):
+                self._feed_status_label.setText("")
 
         # Envanter sayıları
         if inventory is not None:
