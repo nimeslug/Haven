@@ -108,6 +108,33 @@ class MainTab(QWidget):
 
         layout.addWidget(status_box)
 
+        # ---- Görevler kutusu ----
+        quests_box = QFrame()
+        quests_box.setStyleSheet(
+            "QFrame { background: #fef4f7; border: 1px solid #f0c8d0; border-radius: 10px; }"
+        )
+        ql = QVBoxLayout(quests_box)
+        ql.setContentsMargins(14, 12, 14, 12)
+        ql.setSpacing(8)
+
+        qh = QHBoxLayout()
+        qtitle = QLabel("🎯 Bugünkü Görevler")
+        qtitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #a04060;")
+        qh.addWidget(qtitle)
+        qh.addStretch()
+        ql.addLayout(qh)
+
+        # Görev satırları — her görev için bir widget
+        self._quest_rows_container = QVBoxLayout()
+        self._quest_rows_container.setSpacing(6)
+        ql.addLayout(self._quest_rows_container)
+
+        # Görev widget'larını burada saklayacağız
+        self._quest_widgets = {}
+        self._build_quest_rows()
+
+        layout.addWidget(quests_box)
+
         # ---- Açlık göstergesi ----
         hunger_box = QFrame()
         hunger_box.setStyleSheet(
@@ -336,7 +363,108 @@ class MainTab(QWidget):
         emoji = self.haven_app.current_pet.emoji
         self._title_label.setText(f"{emoji}  {display}")
 
+    def _build_quest_rows(self) -> None:
+        """Görev satırlarını üret. Görevler değişince yeniden çağrılabilir."""
+        from quests import get_template_by_key
+
+        # Eski satırları temizle
+        while self._quest_rows_container.count():
+            item = self._quest_rows_container.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._quest_widgets = {}
+
+        quests = self.haven_app.get_daily_quests()
+        if not quests:
+            empty = QLabel("Görev yok — bugün yeni görevler yakında geliyor.")
+            empty.setStyleSheet("font-size: 11px; color: #999; padding: 4px;")
+            self._quest_rows_container.addWidget(empty)
+            return
+
+        for quest in quests:
+            template = get_template_by_key(quest["key"])
+            if template is None:
+                continue
+
+            row = QFrame()
+            row.setStyleSheet("QFrame { background: transparent; }")
+            rl = QHBoxLayout(row)
+            rl.setContentsMargins(0, 0, 0, 0)
+            rl.setSpacing(8)
+
+            # İkon
+            icon_lbl = QLabel(template.icon)
+            icon_lbl.setStyleSheet("font-size: 18px;")
+            icon_lbl.setFixedWidth(28)
+            rl.addWidget(icon_lbl)
+
+            # Metin sütunu
+            text_col = QVBoxLayout()
+            text_col.setSpacing(2)
+
+            title_row = QHBoxLayout()
+            title_row.setSpacing(6)
+            title_lbl = QLabel(template.title)
+            title_lbl.setStyleSheet("font-size: 12px; color: #444;")
+            title_row.addWidget(title_lbl)
+            title_row.addStretch()
+
+            progress_lbl = QLabel(f"{quest['progress']}/{template.target}")
+            progress_lbl.setStyleSheet("font-size: 11px; color: #888; font-weight: 600;")
+            title_row.addWidget(progress_lbl)
+
+            text_col.addLayout(title_row)
+
+            # Alt satır: ödül bilgisi + durum
+            from inventory import FOODS
+            reward_food = FOODS.get(template.reward_food)
+            reward_emoji = reward_food.emoji if reward_food else "🎁"
+
+            status_row = QHBoxLayout()
+            status_row.setSpacing(6)
+            reward_lbl = QLabel(f"Ödül: {reward_emoji}×{template.reward_amount}")
+            reward_lbl.setStyleSheet("font-size: 10px; color: #a08080;")
+            status_row.addWidget(reward_lbl)
+
+            status_lbl = QLabel("")
+            status_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #6a9a6a;")
+            status_row.addWidget(status_lbl)
+            status_row.addStretch()
+
+            text_col.addLayout(status_row)
+            rl.addLayout(text_col, 1)
+
+            self._quest_rows_container.addWidget(row)
+            self._quest_widgets[quest["key"]] = {
+                "progress_lbl": progress_lbl,
+                "status_lbl": status_lbl,
+                "title_lbl": title_lbl,
+            }
+
+    def _refresh_quests(self) -> None:
+        """Görev ilerlemelerini güncelle."""
+        from quests import get_template_by_key
+
+        quests = self.haven_app.get_daily_quests()
+        for quest in quests:
+            template = get_template_by_key(quest["key"])
+            widgets = self._quest_widgets.get(quest["key"])
+            if template is None or widgets is None:
+                continue
+
+            widgets["progress_lbl"].setText(f"{quest['progress']}/{template.target}")
+
+            if quest["completed"]:
+                widgets["status_lbl"].setText("✅ Tamamlandı!")
+                widgets["title_lbl"].setStyleSheet("font-size: 12px; color: #6a9a6a; text-decoration: line-through;")
+            else:
+                widgets["status_lbl"].setText("")
+                widgets["title_lbl"].setStyleSheet("font-size: 12px; color: #444;")
+
     def _refresh_status(self) -> None:
+        # Görev ilerlemelerini güncelle
+        self._refresh_quests()
         animator = self.haven_app.animator
         window = self.haven_app.window
         inventory = self.haven_app.inventory
