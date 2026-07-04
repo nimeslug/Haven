@@ -42,10 +42,11 @@ class InventoryTab(QWidget):
         self._daily_btn = None
         self._daily_status_label = None
         self._feed_status_label = None
+        self._streak_label = None
+        self._streak_max_label = None
 
         self._build_ui()
 
-        # Durumları periyodik güncelle
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._refresh)
         self._timer.start(500)
@@ -158,7 +159,6 @@ class InventoryTab(QWidget):
         layout.addStretch()
 
     def _make_food_card(self, food_key: str, food) -> QWidget:
-        """Bir yem türü için detaylı kart oluştur."""
         card = QFrame()
         card.setStyleSheet("""
             QFrame {
@@ -172,7 +172,6 @@ class InventoryTab(QWidget):
         cl.setContentsMargins(14, 12, 14, 12)
         cl.setSpacing(8)
 
-        # Başlık satırı: emoji + isim + stok
         head = QHBoxLayout()
         emoji_lbl = QLabel(food.emoji)
         emoji_font = QFont()
@@ -199,18 +198,15 @@ class InventoryTab(QWidget):
 
         cl.addLayout(head)
 
-        # Açıklama
         desc_lbl = QLabel(food.description)
         desc_lbl.setStyleSheet("font-size: 11px; color: #666;")
         desc_lbl.setWordWrap(True)
         cl.addWidget(desc_lbl)
 
-        # Boost bilgisi
         boost_lbl = QLabel(f"🍽️ Açlık: +{int(food.hunger_boost)}")
         boost_lbl.setStyleSheet("font-size: 11px; color: #5a8a5a; font-weight: 600;")
         cl.addWidget(boost_lbl)
 
-        # Ver butonu
         feed_btn = QPushButton(f"{food.emoji} Ver")
         feed_btn.setMinimumHeight(34)
         feed_btn.setStyleSheet(self._button_style())
@@ -275,15 +271,16 @@ class InventoryTab(QWidget):
         inventory = self.haven_app.inventory
         if inventory is None:
             return
-        
-        # Streak göstergesi güncelle
+
         state = self.haven_app.user_settings.settings.get_or_create_pet_state(
             self.haven_app.current_pet.folder_name
         )
+
+        # Streak göstergesi
         self._streak_label.setText(f"{state.streak_count} gün")
         self._streak_max_label.setText(f"(En yüksek: {state.max_streak_count})")
 
-        # Sayıları güncelle
+        # Envanter sayıları
         for food_key, lbl in self._count_labels.items():
             lbl.setText(f"×{inventory.get(food_key)}")
 
@@ -298,9 +295,6 @@ class InventoryTab(QWidget):
                 btn.setText(f"{FOODS[food_key].emoji} Ver")
 
         # Günlük ödül durumu
-        state = self.haven_app.user_settings.settings.get_or_create_pet_state(
-            self.haven_app.current_pet.folder_name
-        )
         if can_claim_daily_reward(state.last_daily_reward_ts):
             self._daily_btn.setEnabled(True)
             if not self._daily_status_label.text().startswith(("Aldın", "Yarın")):
