@@ -73,6 +73,9 @@ class InventoryTab(QWidget):
         line.setStyleSheet("color: #ddd;")
         layout.addWidget(line)
 
+        # ---- Günlük ödül ----
+        daily_box = QFrame()
+
         # ---- Streak göstergesi ----
         streak_box = QFrame()
         streak_box.setStyleSheet(
@@ -271,6 +274,13 @@ class InventoryTab(QWidget):
         inventory = self.haven_app.inventory
         if inventory is None:
             return
+        
+        # Streak göstergesi güncelle
+        state = self.haven_app.user_settings.settings.get_or_create_pet_state(
+            self.haven_app.current_pet.folder_name
+        )
+        self._streak_label.setText(f"{state.streak_count} gün")
+        self._streak_max_label.setText(f"(En yüksek: {state.max_streak_count})")
 
         state = self.haven_app.user_settings.settings.get_or_create_pet_state(
             self.haven_app.current_pet.folder_name
