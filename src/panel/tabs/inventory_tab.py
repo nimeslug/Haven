@@ -36,7 +36,6 @@ class InventoryTab(QWidget):
         self._content.setStyleSheet("background: transparent;")
         self._scroll.setWidget(self._content)
 
-        # Bunlar _build_ui içinde doldurulacak
         self._count_labels = {}
         self._feed_buttons = {}
         self._daily_btn = None
@@ -72,9 +71,6 @@ class InventoryTab(QWidget):
         line.setFrameShape(QFrame.Shape.HLine)
         line.setStyleSheet("color: #ddd;")
         layout.addWidget(line)
-
-        # ---- Günlük ödül ----
-        daily_box = QFrame()
 
         # ---- İpuçları ----
         tips_box = QFrame()
@@ -283,6 +279,7 @@ class InventoryTab(QWidget):
             return
         inventory.consume(food_key)
         animator.feed(food_key)
+        self.haven_app.on_pet_fed(food_key)
         self._feed_status_label.setText(
             f"{FOODS[food_key].emoji} {FOODS[food_key].display_name} verildi!"
         )
@@ -300,13 +297,6 @@ class InventoryTab(QWidget):
         inventory = self.haven_app.inventory
         if inventory is None:
             return
-        
-        # Streak göstergesi güncelle
-        state = self.haven_app.user_settings.settings.get_or_create_pet_state(
-            self.haven_app.current_pet.folder_name
-        )
-        self._streak_label.setText(f"{state.streak_count} gün")
-        self._streak_max_label.setText(f"(En yüksek: {state.max_streak_count})")
 
         state = self.haven_app.user_settings.settings.get_or_create_pet_state(
             self.haven_app.current_pet.folder_name

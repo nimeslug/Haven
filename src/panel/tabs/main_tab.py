@@ -301,6 +301,7 @@ class MainTab(QWidget):
         # Envanterden düş + yemi ver
         inventory.consume(food_key)
         animator.feed(food_key)
+        self.haven_app.on_pet_fed(food_key)
         self._feed_status_label.setText(f"{FOODS[food_key].emoji} verildi!")
 
     def _on_daily_clicked(self) -> None:

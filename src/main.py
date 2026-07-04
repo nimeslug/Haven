@@ -313,6 +313,41 @@ class HavenApp:
             state.quests_generated_date = today_str()
             self.user_settings.save()
 
+    def _record_quest_event(self, event_type: str, food_key: Optional[str] = None) -> None:
+        """Bir olay meydana geldiğinde aktif görevlerin ilerlemesini güncelle.
+        Tamamlanan görevleri otomatik olarak ödüllendir."""
+        from quests import record_event, get_template_by_key
+
+        state = self.user_settings.settings.get_or_create_pet_state(
+            self.current_pet.folder_name
+        )
+        if not state.daily_quests:
+            return
+
+        newly_completed = record_event(state.daily_quests, event_type, food_key)
+
+        # Yeni tamamlanan görevler için ödül ver
+        for quest in newly_completed:
+            template = get_template_by_key(quest["key"])
+            if template is None:
+                continue
+            # Envantere ödül ekle
+            if self.inventory is not None:
+                self.inventory.add(template.reward_food, template.reward_amount)
+            quest["claimed"] = True
+            # Görsel geri bildirim
+            self.window.show_bubble("🎉", duration_ms=2500)
+
+        # Değişiklikleri kaydet
+        if newly_completed:
+            self.user_settings.save()
+
+    def on_pet_fed(self, food_key: str) -> None:
+        """Panel'den çağrılır: bir yem verildi."""
+        self._record_quest_event("feed", food_key=food_key)
+        # 'different_food' görevi için de kaydet
+        self._record_quest_event("different_food", food_key=food_key)
+
     def get_daily_quests(self) -> list:
         """Panel'in kullanacağı: aktif görevler."""
         state = self.user_settings.settings.get_or_create_pet_state(
