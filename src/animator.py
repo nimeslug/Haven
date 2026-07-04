@@ -23,6 +23,9 @@ class Animator(QObject):
     position_delta = Signal(int, int)
     bubble_requested = Signal(str)
     happy_jump_triggered = Signal()  # tıklamayla mutlu zıplama olduğunda
+    happy_jump_triggered = Signal()
+    walk_ended = Signal()              # YENİ — yürüme bittiğinde
+    behavior_ended = Signal(str)       # YENİ — bir davranış bittiğinde (adıyla)
 
     FLOAT_TICK_MS = 33
     CLICK_JUMP_DURATION_MS = 500
@@ -323,6 +326,7 @@ class Animator(QObject):
             self._is_walking = False
             self._hop_phase = "idle"
             self._emit_current_frame(self.pet.idle_pixmap)
+            self.walk_ended.emit()
             self._schedule_next_idle_event()
             return
 
@@ -385,12 +389,12 @@ class Animator(QObject):
         if b is None:
             return
         if self._current_frame_index >= len(b.frames):
+            behavior_name = b.name  # sinyali yaymadan önce yakala
             self._current_behavior = None
             self._emit_current_frame(self.pet.idle_pixmap)
+            self.behavior_ended.emit(behavior_name)
             self._schedule_next_idle_event()
             return
-        self._emit_current_frame(b.frames[self._current_frame_index])
-        self._frame_timer.start(b.frame_duration_ms)
 
     def _next_frame(self) -> None:
         self._current_frame_index += 1

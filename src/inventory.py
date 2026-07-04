@@ -72,6 +72,9 @@ DAILY_REWARD_STRAWBERRIES = 2
 DAILY_REWARD_APPLE_CHANCE = 0.6
 DAILY_REWARD_DAISY_CHANCE = 0.25
 HAPPY_JUMP_CARROT_CHANCE = 0.2
+# Rastgele bulma şansları (Pamuk kendi kendine yem bulur)
+WALK_END_CARROT_CHANCE = 0.20      # yürümenin sonunda %20
+LOOK_AROUND_CARROT_CHANCE = 0.30   # look_around davranışı sonunda %30
 
 
 class Inventory:
@@ -177,3 +180,10 @@ def update_streak(last_claim_ts: float, current_streak: int) -> int:
         return current_streak + 1
     # Ara verdi
     return 1
+
+def try_random_find(inventory: Inventory, chance: float) -> bool:
+    """Belirli şansla envantere havuç ekle. Bulduysa True."""
+    if random.random() < chance:
+        inventory.add("carrot", 1)
+        return True
+    return False
